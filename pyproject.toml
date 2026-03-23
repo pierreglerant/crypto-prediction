@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-platform"
+version = "0.1.0"
+description = "Plateforme données crypto : ingestion, pipelines, API, ML, streaming"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: dépend d'un environnement externe (DB, API, Docker, …)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
