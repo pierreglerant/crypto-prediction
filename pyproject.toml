@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Plateforme données crypto : ingestion, pipelines, API, ML, streaming"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
 
 [project.optional-dependencies]
 dev = [
