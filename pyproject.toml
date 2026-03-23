@@ -27,5 +27,21 @@ markers = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 150
 target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = [
+    "E",    # pycodestyle — erreurs (incl. E501 longueur de ligne, alignée sur line-length)
+    "W",    # pycodestyle — avertissements style PEP 8
+    "N",    # pep8-naming — conventions de nommage PEP 8
+    "I",    # isort — ordre des imports (PEP 8)
+    "D",    # pydocstyle — docstrings (PEP 257)
+    "C901", # McCabe — complexité cyclomatique
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
