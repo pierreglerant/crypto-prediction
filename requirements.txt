@@ -1,0 +1,2 @@
+# Runtime : voir pyproject.toml → [project.dependencies]
+-e .
