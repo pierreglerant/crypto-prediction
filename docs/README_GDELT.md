@@ -174,7 +174,6 @@ Each cryptocurrency maintains separate cache files.
 | `bronze_layer.py` | Load CSV, optionally fetch from GDELT |
 | `silver_layer.py` | Clean, deduplicate, validate |
 | `gold_layer.py` | Aggregate by date and source |
-| `gdelt_client.py` | GDELT API client (rate limiting, retries) |
 | `pipeline_runner.py` | Orchestrate all layers |
 
 ## Error Handling

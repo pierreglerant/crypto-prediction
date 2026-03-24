@@ -44,7 +44,16 @@ DOGECOIN_CONFIG = {
 
 # Example usage:
 if __name__ == "__main__":
-    from pipeline_runner import run_pipeline
+    import sys
+    from pathlib import Path
+
+    try:
+        from src.pipelines.pipeline_gdelt import run_pipeline
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[3]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        from src.pipelines.pipeline_gdelt import run_pipeline
 
     # Process Bitcoin with GDELT fetch
     print("Processing Bitcoin...")
