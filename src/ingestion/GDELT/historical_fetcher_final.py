@@ -3,6 +3,8 @@ import time
 from datetime import datetime, timedelta
 import sys
 import os
+import requests
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from gdelt_client import GDELTClient
@@ -11,12 +13,14 @@ import os
 class GDELTHistoricalFetcher:
     """
     Récupération historique GDELT avec sauvegarde progressive
-    Données de sentiment Bitcoin depuis 2015
+    Remonte le temps depuis aujourd'hui jusqu'au point où les données ne sont plus disponibles
+    GDELT API limite: 1 requête par 5 secondes
     """
 
     def __init__(self, csv_file="bitcoin_sentiment_historical.csv"):
         self.csv_file = csv_file
         self.client = GDELTClient(timeout=60)
+        self.min_request_interval = 5.0  # API requiert minimum 5s entre requêtes
 
         # Créer le fichier CSV avec headers si inexistant
         if not os.path.exists(csv_file):
@@ -69,16 +73,21 @@ class GDELTHistoricalFetcher:
 
                     if sentiment_data and "timeline" in sentiment_data:
                         timeline = sentiment_data["timeline"]
-                        for day_data in timeline:
-                            date_key = day_data.get('date', '')
-                            if date_key:
-                                month_data[date_key] = {
-                                    'tone': day_data.get('tone', 0.0),
-                                    'volume': day_data.get('volume', 0),
-                                    'positive_mentions': day_data.get('positive_mentions', 0),
-                                    'negative_mentions': day_data.get('negative_mentions', 0),
-                                    'neutral_mentions': day_data.get('neutral_mentions', 0),
-                                }
+                        # Timeline contains series objects, each with a 'data' array
+                        for series_obj in timeline:
+                            if 'data' not in series_obj:
+                                continue
+                            # Each data point has: {'date': 'YYYYMMDDTHHMMSSZ', 'value': float}
+                            for data_point in series_obj['data']:
+                                date_key = data_point.get('date', '')
+                                if date_key:
+                                    month_data[date_key] = {
+                                        'tone': data_point.get('value', 0.0),  # 'value' = tone score
+                                        'volume': 0,  # Not available in timelinetone API
+                                        'positive_mentions': 0,  # Not available
+                                        'negative_mentions': 0,  # Not available
+                                        'neutral_mentions': 0,  # Not available
+                                    }
 
                     time.sleep(5)  # Pause entre requêtes
                     break
@@ -113,63 +122,85 @@ class GDELTHistoricalFetcher:
                 data['status']
             ])
 
-    def fetch_historical_data(self, start_date="2015-01-01", end_date=None):
+    def fetch_with_date_range(self, start_date, end_date):
         """
-        Récupère toutes les données depuis 2015 jusqu'à aujourd'hui
-        Par mois pour être efficace et respecter les rate limits
+        Récupère sentiment avec plage de dates précises (format: YYYYMMDDHHMMSS)
+        GDELT API limite: dates doivent être dans les 3 derniers mois max
+        """
+        try:
+            time.sleep(self.min_request_interval)
+            sentiment_data = self.client.get_sentiment(
+                query="bitcoin",
+                start_datetime=start_date,  # YYYYMMDDHHMMSS
+                end_datetime=end_date       # YYYYMMDDHHMMSS
+            )
+            return sentiment_data
+        except Exception as e:
+            print(f"   Erreur [{start_date} -> {end_date}]: {str(e)[:100]}")
+            return None
+
+    def fetch_historical_data(self, start_date="2017-01-01", end_date=None):
+        """
+        Récupère données en remontant depuis aujourd'hui dans les 3 derniers mois
+        (limitation API: GDELT DOC API ne supporte que les 3 derniers mois)
         """
         if end_date is None:
             end_date = datetime.now().strftime("%Y-%m-%d")
 
-        start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
+        start_limit = end - timedelta(days=90)  # 3 mois = ~90 jours max
+        
+        # Ne pas dépasser la limite
+        start = max(datetime.strptime(start_date, "%Y-%m-%d"), start_limit)
 
         existing_dates = self.get_existing_dates()
         print(f"Dates déjà traitées: {len(existing_dates)}")
+        print(f"⚠️  Limite API GDELT: max 3 mois historiques")
+        print(f"   Plage: {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')}")
 
-        # Itérer par mois
-        current_date = start.replace(day=1)
-        total_months = (end.year - start.year) * 12 + (end.month - start.month) + 1
-        processed_months = 0
+        # Récupérer jour par jour dans les 3 derniers mois
+        current_date = start
+        day_num = 0
 
         try:
             while current_date <= end:
-                year, month = current_date.year, current_date.month
-                month_str = f"{year}-{month:02d}"
+                year, month, day = current_date.year, current_date.month, current_date.day
+                day_str = f"{year}-{month:02d}-{day:02d}"
 
-                print(f"\n=== MOIS {month_str} ({processed_months+1}/{total_months}) ===")
+                # Format GDELT: YYYYMMDDHHMMSS
+                start_dt = f"{year}{month:02d}{day:02d}000000"
+                end_dt = f"{year}{month:02d}{day:02d}235959"
 
-                # Récupérer les données du mois
-                month_data = self.fetch_month_sentiment(year, month)
+                day_num += 1
+                print(f"\n📅 Jour {day_num}: {day_str}")
 
-                # Sauvegarder chaque jour
+                sentiment_data = self.fetch_with_date_range(start_dt, end_dt)
+
                 days_saved = 0
-                for date_key, day_data in month_data.items():
-                    if date_key not in existing_dates:
-                        csv_data = {
-                            'date': date_key,
-                            'tone': day_data['tone'],
-                            'volume': day_data['volume'],
-                            'positive_mentions': day_data['positive_mentions'],
-                            'negative_mentions': day_data['negative_mentions'],
-                            'neutral_mentions': day_data['neutral_mentions'],
-                            'status': 'success'
-                        }
-                        self.save_to_csv(csv_data)
-                        days_saved += 1
+                if sentiment_data and "timeline" in sentiment_data:
+                    timeline = sentiment_data["timeline"]
+                    for series_obj in timeline:
+                        if 'data' not in series_obj:
+                            continue
+                        for data_point in series_obj['data']:
+                            date_key = data_point.get('date', '')
+                            if date_key and date_key not in existing_dates:
+                                csv_data = {
+                                    'date': date_key,
+                                    'tone': data_point.get('value', 0.0),
+                                    'volume': 0,
+                                    'positive_mentions': 0,
+                                    'negative_mentions': 0,
+                                    'neutral_mentions': 0,
+                                    'status': 'success'
+                                }
+                                self.save_to_csv(csv_data)
+                                existing_dates.add(date_key)
+                                days_saved += 1
+                
+                print(f"   ✓ {days_saved} points temps sauvegardés")
 
-                print(f"✓ {days_saved} jours sauvegardés pour {month_str}")
-
-                # Pause entre mois
-                if processed_months > 0 and processed_months % 3 == 0:
-                    print("⏸️  Pause de 2 minutes...")
-                    time.sleep(120)
-                else:
-                    print("⏸️  Pause de 30s...")
-                    time.sleep(30)
-
-                processed_months += 1
-                current_date = current_date.replace(month=month+1) if month < 12 else current_date.replace(year=year+1, month=1)
+                current_date += timedelta(days=1)
 
         except KeyboardInterrupt:
             print("\n🛑 Interruption détectée!")
@@ -178,24 +209,24 @@ class GDELTHistoricalFetcher:
             print(f"\n💥 Erreur: {e}")
             print("Données sauvegardées dans le CSV.")
         finally:
-            # Assure que le fichier est bien fermé et que l'état en mémoire est conservé
             print("État sauvegardé en fin de session (ou après erreur).")
 
         print("\n📊 === RÉSUMÉ FINAL ===")
-        print(f"Total mois traités: {processed_months}")
+        print(f"Total jours traités: {day_num}")
         print(f"Fichier: {self.csv_file}")
-        print("Prêt pour l'analyse ML!")
+        print(f"Nombre de points temps avec données: {len(existing_dates)}")
+        print("✓ Les 3 derniers mois de données Bitcoin sauvegardés!")
 
 def main():
     print("🚀 === GDELT HISTORICAL SENTIMENT FETCHER ===")
-    print("Récupération données Bitcoin 2018-aujourd'hui (limite API GDELT)")
-    print("Sauvegarde progressive - Résistant aux interruptions")
+    print("Récupération données Bitcoin: remonte depuis aujourd'hui")
+    print("Arrête cuando les données ne sont plus disponibles ou timeout")
+    print("Respect de la limite API: 1 requête par 5 secondes minimum")
     print()
 
     fetcher = GDELTHistoricalFetcher()
 
-    # ⚠️ ATTENTION: GDELT API v2 ne supporte que depuis janvier 2017
-    # La récupération peut prendre plusieurs heures (rate limits GDELT: ~1 req/5s)
+    # Remonte depuis aujourd'hui vers 2017 (limite GDELT API)
     fetcher.fetch_historical_data(
         start_date="2018-01-01",
         end_date=datetime.now().strftime("%Y-%m-%d")

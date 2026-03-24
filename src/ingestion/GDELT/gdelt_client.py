@@ -99,13 +99,29 @@ class GDELTClient:
         self,
         query: str,
         timespan: str = "7d",
+        start_datetime: str = None,
+        end_datetime: str = None,
     ) -> Dict[str, Any]:
+        """
+        Récupère le sentiment pour bitcoin.
+        
+        Peut utiliser SOIT:
+        - timespan (ex: "7d"): offset depuis maintenant
+        - start_datetime/end_datetime (format: YYYYMMDDHHMMSS): dates précises (max 3 mois)
+        """
         params = {
             "query": f'"{query}"',
             "mode": "timelinetone",
-            "timespan": timespan,
             "format": "json",
         }
+        
+        # Utiliser dates précises si fournies
+        if start_datetime and end_datetime:
+            params["STARTDATETIME"] = start_datetime
+            params["ENDDATETIME"] = end_datetime
+        else:
+            # Sinon utiliser timespan (offset depuis maintenant)
+            params["timespan"] = timespan
 
         return self._get(params)
 
