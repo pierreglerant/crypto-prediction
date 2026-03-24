@@ -1,22 +1,31 @@
-import requests
-from typing import List, Dict, Any
+"""
+GDELT API client.
+
+Provides methods to interact with the GDELT API for fetching news articles.
+"""
 import time
+from typing import Any, Dict, List
+
+import requests
 
 
 class GDELTClient:
+    """GDELT API client for fetching news articles."""
+
     BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
     def __init__(self, timeout: int = 30):
+        """Initialize the GDELT client."""
         self.timeout = timeout
 
     def _get(self, params: Dict[str, Any]) -> Dict[str, Any]:
         max_retries = 3
         retry_count = 0
-        
+
         while retry_count < max_retries:
             try:
                 response = requests.get(self.BASE_URL, params=params, timeout=self.timeout)
-                
+
                 # Handle rate limiting (429 Too Many Requests)
                 if response.status_code == 429:
                     retry_count += 1
@@ -24,12 +33,12 @@ class GDELTClient:
                     print(f"Rate limited. Waiting {wait_time}s before retry {retry_count}/{max_retries}...")
                     time.sleep(wait_time)
                     continue
-                
+
                 response.raise_for_status()
                 return response.json()
             except requests.exceptions.RequestException as e:
                 raise RuntimeError(f"GDELT API error: {e}")
-        
+
         raise RuntimeError("Max retries for rate limiting exceeded")
 
     def get_articles_with_sentiment(
@@ -42,6 +51,7 @@ class GDELTClient:
     ) -> List[Dict[str, Any]]:
         """
         Récupère les articles AVEC leurs scores de sentiment.
+
         Utilise le mode 'artlist' avec paramètres pour inclure les sentiments.
         """
         all_articles = []
@@ -104,7 +114,7 @@ class GDELTClient:
     ) -> Dict[str, Any]:
         """
         Récupère le sentiment pour bitcoin.
-        
+
         Peut utiliser SOIT:
         - timespan (ex: "7d"): offset depuis maintenant
         - start_datetime/end_datetime (format: YYYYMMDDHHMMSS): dates précises (max 3 mois)
@@ -114,7 +124,7 @@ class GDELTClient:
             "mode": "timelinetone",
             "format": "json",
         }
-        
+
         # Utiliser dates précises si fournies
         if start_datetime and end_datetime:
             params["STARTDATETIME"] = start_datetime
@@ -132,14 +142,15 @@ class GDELTClient:
     def extract_sentiment_from_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Extrait les scores de sentiment de chaque article.
+
         GDELT fournit différents champs selon le mode utilisé.
         """
         sentiment_data = []
-        
+
         # Debug: afficher les clés disponibles du premier article
         if articles:
             print(f"Clés disponibles dans les articles: {list(articles[0].keys())}")
-        
+
         for article in articles:
             sentiment_info = {
                 "title": article.get("title", ""),
@@ -160,5 +171,5 @@ class GDELTClient:
                 "themes": article.get("themes", article.get("Themes", [])),
             }
             sentiment_data.append(sentiment_info)
-        
+
         return sentiment_data
