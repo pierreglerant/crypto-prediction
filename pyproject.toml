@@ -13,6 +13,10 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "requests>=2.31",
     "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "seaborn>=0.13",
+    "plotly>=5.0",
+    "nbformat>=4.2",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +39,7 @@ markers = [
 [tool.ruff]
 line-length = 150
 target-version = "py311"
+extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 extend-select = [
