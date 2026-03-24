@@ -11,22 +11,16 @@ def build_gold_features(df: pd.DataFrame) -> pd.DataFrame:
     # FEATURES
     # =========================
 
-    # Returns
     df["return_1d"] = df["close"].pct_change()
     df["return_7d"] = df["close"].pct_change(7)
 
-    # Volatility
     df["volatility_7d"] = df["return_1d"].rolling(7).std()
     df["volatility_30d"] = df["return_1d"].rolling(30).std()
 
-    # Drawdown
     df["cummax"] = df["close"].cummax()
     df["drawdown"] = (df["close"] - df["cummax"]) / df["cummax"]
 
-    # Volume normalization
     df["volume_norm"] = df["volume"] / df["volume"].rolling(30).mean()
-
-    # Buy pressure
     df["buy_pressure"] = df["taker_buy_base_volume"] / df["volume"]
 
     # =========================
@@ -40,29 +34,29 @@ def build_gold_features(df: pd.DataFrame) -> pd.DataFrame:
     df["lag_buy_pressure"] = df["buy_pressure"].shift(1)
 
     # =========================
-    # PEAK DETECTION (TARGET)
+    # TARGET (IMPROVED PEAK)
     # =========================
 
     horizon = 7
     drop_threshold = -0.10
+    window = 3  # taille du voisinage pour max local
 
-    # Future min (crash condition)
+    # Future crash condition
     df["future_min"] = df["close"].rolling(horizon).min().shift(-horizon)
     df["future_drawdown"] = (df["future_min"] / df["close"]) - 1
-
-    # Future max (local peak detection)
-    df["future_max"] = df["close"].rolling(horizon).max().shift(-horizon)
-    df["distance_to_peak"] = (df["future_max"] - df["close"]) / df["close"]
-
-    # Conditions
     crash_condition = df["future_drawdown"] < drop_threshold
-    peak_condition = df["distance_to_peak"] < 0.02  # proche du max
 
-    df["target"] = crash_condition & peak_condition
+    # Local max condition (symétrique)
+    rolling_max_past = df["close"].rolling(window, center=False).max()
+    rolling_max_future = df["close"].shift(-window + 1).rolling(window).max()
 
-    # Keep only first occurrence (event-based)
-    previous_target = df["target"].shift(1, fill_value=False)
-    df["target"] = df["target"] & ~previous_target
+    is_local_max = (df["close"] >= rolling_max_past) & (df["close"] >= rolling_max_future)
+
+    # Combine conditions
+    df["target"] = crash_condition & is_local_max
+
+    # Keep only strongest peak in cluster
+    df["target"] = df["target"] & (df["close"] == df["close"].rolling(window * 2 + 1, center=True).max())
 
     # =========================
     # CLEAN
@@ -73,8 +67,6 @@ def build_gold_features(df: pd.DataFrame) -> pd.DataFrame:
             "cummax",
             "future_min",
             "future_drawdown",
-            "future_max",
-            "distance_to_peak",
         ]
     )
 
