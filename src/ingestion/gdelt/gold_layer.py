@@ -5,9 +5,11 @@ GOLD LAYER: Aggregate articles by date and source domain.
 Output final dataset with article counts per day/source
 Agnostic to cryptocurrency type
 """
+
 import csv
 import os
 from collections import defaultdict
+from pathlib import Path
 
 
 class GoldLayer:
@@ -18,13 +20,18 @@ class GoldLayer:
         Args.
 
         coin_name: Name of cryptocurrency
-        input_csv: Path to input CSV (default: {coin_name}_silver.csv)
-        output_csv: Path to output CSV (default: {coin_name}_gold.csv)
+        input_csv: Path to input CSV (default: data/silver/{coin_name}_silver.csv)
+        output_csv: Path to output CSV (default: data/gold/{coin_name}_gold.csv)
         source_mappings: Dict mapping domain → source name
         """
         self.coin_name = coin_name
-        self.input_csv = input_csv or f"{coin_name}_silver.csv"
-        self.output_csv = output_csv or f"{coin_name}_gold.csv"
+        repo_root = Path(__file__).resolve().parents[3]
+        data_root = repo_root / "data"
+        gold_dir = data_root / "gold"
+        gold_dir.mkdir(parents=True, exist_ok=True)
+
+        self.input_csv = str(input_csv) if input_csv else str(data_root / "silver" / f"{coin_name}_silver.csv")
+        self.output_csv = str(output_csv) if output_csv else str(gold_dir / f"{coin_name}_gold.csv")
 
         # Default source mappings (can be overridden)
         self.source_mappings = source_mappings or {
@@ -71,13 +78,13 @@ class GoldLayer:
     def _load_and_aggregate_data(self):
         """Load CSV data and aggregate by date and source."""
         try:
-            with open(self.input_csv, 'r', encoding='utf-8') as f:
+            with open(self.input_csv, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
 
                 for row in reader:
                     try:
-                        date_val = row.get('date', '')
-                        domain = row.get('domain', '')
+                        date_val = row.get("date", "")
+                        domain = row.get("domain", "")
 
                         if not date_val or not domain:
                             continue
@@ -103,7 +110,7 @@ class GoldLayer:
     def _write_aggregated_csv(self):
         """Write aggregated data to output CSV."""
         print()
-        print("📊 Writing aggregated CSV...")
+        print(" Writing aggregated CSV...")
 
         # Get all unique sources
         all_sources = set()
@@ -113,16 +120,16 @@ class GoldLayer:
         all_sources = sorted(list(all_sources))
 
         # Write output
-        fieldnames = ['date'] + all_sources + ['total']
+        fieldnames = ["date"] + all_sources + ["total"]
 
         try:
-            with open(self.output_csv, 'w', newline='', encoding='utf-8') as f:
+            with open(self.output_csv, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
 
                 # Write sorted by date
                 for date_val in sorted(self.data.keys()):
-                    row = {'date': date_val}
+                    row = {"date": date_val}
                     day_total = 0
 
                     for source in all_sources:
@@ -130,7 +137,7 @@ class GoldLayer:
                         row[source] = count if count > 0 else 0
                         day_total += count
 
-                    row['total'] = day_total
+                    row["total"] = day_total
                     writer.writerow(row)
 
         except Exception as e:
@@ -140,9 +147,9 @@ class GoldLayer:
 
     def run(self):
         """Execute gold layer aggregation."""
-        print(f"🏆 === GOLD LAYER: Aggregate {self.coin_name.upper()} ===")
-        print(f"📥 Input: {self.input_csv}")
-        print(f"📤 Output: {self.output_csv}")
+        print(f" === GOLD LAYER: Aggregate {self.coin_name.upper()} ===")
+        print(f" Input: {self.input_csv}")
+        print(f" Output: {self.output_csv}")
         print()
 
         if not os.path.exists(self.input_csv):
@@ -159,12 +166,12 @@ class GoldLayer:
             return
 
         print()
-        print("📊 === GOLD SUMMARY ===")
+        print(" === GOLD SUMMARY ===")
         print(f"Articles aggregated: {self.total_articles:,}")
         print(f"Unique days: {len(self.data):,}")
         print(f"Unique sources: {len(all_sources)}")
         if all_sources:
-            sources_preview = ', '.join(all_sources[:10])
+            sources_preview = ", ".join(all_sources[:10])
             if len(all_sources) > 10:
                 sources_preview += f"... (+{len(all_sources) - 10} more)"
             print(f"  {sources_preview}")

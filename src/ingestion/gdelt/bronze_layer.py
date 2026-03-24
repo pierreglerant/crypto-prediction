@@ -4,11 +4,13 @@ BRONZE LAYER: Load articles from CSV and optionally fetch missing dates from GDE
 
 Agnostic to cryptocurrency type
 """
+
 import csv
 import json
 import os
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
@@ -23,13 +25,32 @@ class BronzeLayer:
 
         coin_name: Name of cryptocurrency (bitcoin, ethereum, etc.)
         query_terms: List of search terms (["bitcoin", "btc"])
-        input_csv: Path to input CSV (default: {coin_name}_articles_bigquery.csv)
-        output_jsonl: Path to output JSONL (default: {coin_name}_bronze.jsonl)
+        input_csv: Path to input CSV (default: data/cache/bigquery/{coin_name}_articles_bigquery.csv)
+        output_jsonl: Path to output JSONL (default: data/bronze/{coin_name}_bronze.jsonl)
         """
         self.coin_name = coin_name
         self.query_terms = query_terms
-        self.input_csv = input_csv or f"{coin_name}_articles_bigquery.csv"
-        self.output_jsonl = output_jsonl or f"{coin_name}_bronze.jsonl"
+        repo_root = Path(__file__).resolve().parents[3]
+        data_root = repo_root / "data"
+
+        default_cache_dir = data_root / "cache" / "bigquery"
+        fallback_cache_dir = data_root / "cache"
+        bronze_dir = data_root / "bronze"
+        bronze_dir.mkdir(parents=True, exist_ok=True)
+
+        default_input = default_cache_dir / f"{coin_name}_articles_bigquery.csv"
+        fallback_input = fallback_cache_dir / f"{coin_name}_articles_bigquery.csv"
+
+        if input_csv:
+            self.input_csv = str(input_csv)
+        elif default_input.exists():
+            self.input_csv = str(default_input)
+        elif fallback_input.exists():
+            self.input_csv = str(fallback_input)
+        else:
+            self.input_csv = str(default_input)
+
+        self.output_jsonl = str(output_jsonl) if output_jsonl else str(bronze_dir / f"{coin_name}_bronze.jsonl")
         self.min_request_interval = 5.0
         self.articles_loaded = 0
         self.articles_fetched = 0
@@ -37,12 +58,12 @@ class BronzeLayer:
     def get_max_date_from_csv(self):
         """Extract max date from CSV."""
         try:
-            with open(self.input_csv, 'r', encoding='utf-8') as f:
+            with open(self.input_csv, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 dates = []
                 for row in reader:
-                    if row.get('day') or row.get('date'):
-                        date_val = row.get('day') or row.get('date')
+                    if row.get("day") or row.get("date"):
+                        date_val = row.get("day") or row.get("date")
                         dates.append(date_val)
                 if dates:
                     return max(dates)
@@ -52,9 +73,9 @@ class BronzeLayer:
 
     def load_csv_to_jsonl(self):
         """Load CSV and convert to enriched JSONL format."""
-        print(f"🚀 === BRONZE LAYER: Load {self.coin_name.upper()} ===")
-        print(f"📥 Input: {self.input_csv}")
-        print(f"📤 Output: {self.output_jsonl}")
+        print(f" === BRONZE LAYER: Load {self.coin_name.upper()} ===")
+        print(f" Input: {self.input_csv}")
+        print(f" Output: {self.output_jsonl}")
         print()
 
         if not os.path.exists(self.input_csv):
@@ -62,17 +83,17 @@ class BronzeLayer:
             return False
 
         # Reset output file
-        with open(self.output_jsonl, 'w', encoding='utf-8'):
+        with open(self.output_jsonl, "w", encoding="utf-8"):
             pass
 
         try:
-            with open(self.input_csv, 'r', encoding='utf-8') as infile:
+            with open(self.input_csv, "r", encoding="utf-8") as infile:
                 reader = csv.DictReader(infile)
 
-                with open(self.output_jsonl, 'a', encoding='utf-8') as outfile:
+                with open(self.output_jsonl, "a", encoding="utf-8") as outfile:
                     for row in reader:
-                        url = row.get('url') or row.get('URL') or row.get('DocumentIdentifier')
-                        date_val = row.get('day') or row.get('date') or row.get('DATE')
+                        url = row.get("url") or row.get("URL") or row.get("DocumentIdentifier")
+                        date_val = row.get("day") or row.get("date") or row.get("DATE")
 
                         if not url or not date_val:
                             continue
@@ -80,19 +101,15 @@ class BronzeLayer:
                         # Extract domain
                         try:
                             domain = urlparse(url).netloc.lower()
-                            if domain.startswith('www.'):
+                            if domain.startswith("www."):
                                 domain = domain[4:]
                         except Exception:
                             domain = ""
 
                         # Create enriched article
-                        article = {
-                            'url': url,
-                            'seendate': date_val,
-                            'domain': domain
-                        }
+                        article = {"url": url, "seendate": date_val, "domain": domain}
 
-                        outfile.write(json.dumps(article, ensure_ascii=False) + '\n')
+                        outfile.write(json.dumps(article, ensure_ascii=False) + "\n")
                         self.articles_loaded += 1
 
                         if self.articles_loaded % 100000 == 0:
@@ -116,7 +133,7 @@ class BronzeLayer:
 
         time.sleep(self.min_request_interval)
 
-        print(f"📅 {start_date.strftime('%Y-%m-%d')} → {end_date.strftime('%Y-%m-%d')}...", end=" ", flush=True)
+        print(f" {start_date.strftime('%Y-%m-%d')} → {end_date.strftime('%Y-%m-%d')}...", end=" ", flush=True)
 
         try:
             params = {
@@ -128,25 +145,21 @@ class BronzeLayer:
                 "ENDDATETIME": end_dt,
             }
 
-            response = requests.get(
-                "https://api.gdeltproject.org/api/v2/doc/doc",
-                params=params,
-                timeout=60
-            )
+            response = requests.get("https://api.gdeltproject.org/api/v2/doc/doc", params=params, timeout=60)
 
             if response.status_code == 200:
                 data = response.json()
                 articles = data.get("articles", [])
 
                 # Append to JSONL
-                with open(self.output_jsonl, 'a', encoding='utf-8') as f:
+                with open(self.output_jsonl, "a", encoding="utf-8") as f:
                     for article in articles:
-                        article['seendate'] = start_date.strftime('%Y-%m-%d')
-                        domain = article.get('domain', '').lower()
-                        if domain.startswith('www.'):
+                        article["seendate"] = start_date.strftime("%Y-%m-%d")
+                        domain = article.get("domain", "").lower()
+                        if domain.startswith("www."):
                             domain = domain[4:]
-                        article['domain'] = domain
-                        f.write(json.dumps(article, ensure_ascii=False) + '\n')
+                        article["domain"] = domain
+                        f.write(json.dumps(article, ensure_ascii=False) + "\n")
                         self.articles_fetched += 1
 
                 print(f"✓ {len(articles)} articles")
@@ -172,14 +185,14 @@ class BronzeLayer:
             print("⚠️ Unable to determine max date from CSV")
             return
 
-        max_date_obj = datetime.strptime(max_date, '%Y-%m-%d')
+        max_date_obj = datetime.strptime(max_date, "%Y-%m-%d")
         today = datetime.now()
 
         if max_date_obj >= today:
             print(f"✓ CSV already up-to-date (max date: {max_date})")
             return
 
-        print(f"\n📡 Fetch missing dates: {max_date} → {today.strftime('%Y-%m-%d')}")
+        print(f"\n Fetch missing dates: {max_date} → {today.strftime('%Y-%m-%d')}")
         print()
 
         # Build query string
@@ -213,7 +226,7 @@ class BronzeLayer:
         if success and fetch_missing:
             self.fetch_missing_dates()
 
-        print("\n📊 === BRONZE SUMMARY ===")
+        print("\n === BRONZE SUMMARY ===")
         print(f"Articles loaded from CSV: {self.articles_loaded:,}")
         print(f"Articles fetched from GDELT: {self.articles_fetched:,}")
         print(f"Total: {self.articles_loaded + self.articles_fetched:,}")
