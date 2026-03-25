@@ -50,6 +50,11 @@ extend-select = [
     "D",    # pydocstyle — docstrings (PEP 257)
     "C901", # McCabe — complexité cyclomatique
 ]
+per-file-ignores = {
+    "src/ml/data.py" = ["N803"],
+    "src/ml/pipeline.py" = ["N806"],
+    "src/ml/training.py" = ["N803", "N806"],
+}
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
