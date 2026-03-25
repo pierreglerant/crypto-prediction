@@ -25,6 +25,9 @@ dev = [
     "ruff>=0.6",
     "pre-commit>=3.5",
 ]
+airflow = [
+    "apache-airflow>=2.10",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -38,6 +38,47 @@ Run complete pipeline for Bitcoin:
 python3 pipeline_runner.py
 ```
 
+## Airflow Orchestration
+
+The repository now includes an Airflow DAG for the GDELT pipeline:
+
+- DAG file: `dags/gdelt_media_dag.py`
+- DAG ID: `gdelt_media_pipeline`
+- Schedule: daily at `02:00` (UTC)
+
+### Start Airflow
+
+```bash
+docker-compose up airflow-init
+docker-compose up -d airflow-scheduler airflow-webserver
+```
+
+Airflow UI is available at `http://localhost:8080`.
+
+Default login:
+
+- username: `admin`
+- password: `admin`
+
+### Runtime Variables
+
+Configure variables from Airflow UI (`Admin -> Variables`):
+
+- `GDELT_COIN` (default: `bitcoin`)
+- `GDELT_QUERY_TERMS` (default: `bitcoin,btc`)
+- `GDELT_FETCH_MISSING` (`true` or `false`, default: `false`)
+- `GDELT_SOURCE_MAPPINGS_JSON` (optional JSON object)
+
+Example for source mappings:
+
+```json
+{
+      "cnn.com": "CNN",
+      "reuters.com": "Reuters",
+      "coindesk.com": "CoinDesk"
+}
+```
+
 ### Advanced Options
 
 ```bash
@@ -175,6 +216,7 @@ Each cryptocurrency maintains separate cache files.
 | `silver_layer.py` | Clean, deduplicate, validate |
 | `gold_layer.py` | Aggregate by date and source |
 | `pipeline_runner.py` | Orchestrate all layers |
+| `dags/gdelt_media_dag.py` | Airflow DAG orchestration |
 
 ## Error Handling
 
