@@ -1,4 +1,4 @@
-"""Airflow DAG for BTC market data pipeline (bronze -> silver -> gold)."""
+"""Airflow DAG for ETH market data pipeline (bronze -> silver -> gold)."""
 
 from __future__ import annotations
 
@@ -42,19 +42,19 @@ def _data_root() -> Path:
 
 
 def _bronze_path(interval: str) -> Path:
-    return _data_root() / "bronze" / "market" / f"btc_usdt_{interval}_raw.json"
+    return _data_root() / "bronze" / "market" / f"eth_usdt_{interval}_raw.json"
 
 
 def _silver_path(interval: str) -> Path:
-    return _data_root() / "silver" / "market" / f"btc_usdt_{interval}.csv"
+    return _data_root() / "silver" / "market" / f"eth_usdt_{interval}.csv"
 
 
 def _gold_path(interval: str) -> Path:
-    return _data_root() / "gold" / "market" / f"btc_usdt_{interval}_features.csv"
+    return _data_root() / "gold" / "market" / f"eth_usdt_{interval}_features.csv"
 
 
 def _artifact_symbol() -> str:
-    return "btc_usdt"
+    return "eth_usdt"
 
 
 def _get_variable(key: str, default: str) -> str:
@@ -67,9 +67,9 @@ def _get_variable(key: str, default: str) -> str:
 
 def task_bronze(**context):
     """Fetch klines from Binance, save as JSON, push artifact path to XCom."""
-    symbol = _get_variable("BTC_SYMBOL", "BTCUSDT").strip().upper()
-    interval = _get_variable("BTC_INTERVAL", "1d").strip()
-    start_date = _get_variable("BTC_START_DATE", "2017-01-01").strip()
+    symbol = _get_variable("ETH_SYMBOL", "ETHUSDT").strip().upper()
+    interval = _get_variable("ETH_INTERVAL", "1d").strip()
+    start_date = _get_variable("ETH_START_DATE", "2017-01-01").strip()
 
     raw_data = fetch_full_history(symbol, interval, start_date)
     save_data(raw_data, "bronze", symbol=_artifact_symbol(), interval=interval, suffix="_raw", is_json=True)
@@ -78,7 +78,7 @@ def task_bronze(**context):
 
 def task_silver(**context):
     """Clean bronze JSON into silver CSV, push artifact path to XCom."""
-    interval = _get_variable("BTC_INTERVAL", "1d").strip()
+    interval = _get_variable("ETH_INTERVAL", "1d").strip()
 
     bronze_path = _bronze_path(interval)
     with open(bronze_path, encoding="utf-8") as handle:
@@ -91,7 +91,7 @@ def task_silver(**context):
 
 def task_gold(**context):
     """Engineer features from silver CSV into gold CSV, push artifact path to XCom."""
-    interval = _get_variable("BTC_INTERVAL", "1d").strip()
+    interval = _get_variable("ETH_INTERVAL", "1d").strip()
 
     silver_path = _silver_path(interval)
     df_silver = pd.read_csv(silver_path, parse_dates=["open_time"])
@@ -108,14 +108,14 @@ DEFAULT_ARGS = {
 }
 
 with DAG(
-    dag_id="btc_market_pipeline",
+    dag_id="eth_market_pipeline",
     default_args=DEFAULT_ARGS,
-    description="Daily BTC/USDT market data pipeline: Binance ingestion to gold features",
+    description="Daily ETH/USDT market data pipeline: Binance ingestion to gold features",
     start_date=datetime(2024, 1, 1),
-    schedule="0 0 * * *",  # daily at midnight UTC (different from GDELT at 02:00)
+    schedule="0 0 * * *",
     catchup=False,
     max_active_runs=1,
-    tags=["btc", "market", "binance", "etl"],
+    tags=["eth", "market", "binance", "etl"],
 ) as dag:
     bronze = PythonOperator(
         task_id="bronze",
