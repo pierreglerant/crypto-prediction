@@ -1,12 +1,17 @@
-"""Main pipeline orchestrating model training and evaluation."""
+"""Pipeline orchestrating ML model tuning and benchmarking."""
 
-from ml.config import N_SPLITS, PARAM_GRIDS, TARGET, TEST_SIZE_RATIO, THRESHOLD
+from ml.config import N_SPLITS, N_TRIALS, TARGET, TEST_SIZE_RATIO
 from ml.data import get_tscv, train_test_split_time
 from ml.model import get_models
-from ml.training import benchmark_model, search_model
+from ml.training import benchmark_model, search_model_optuna
 
 
-def run_pipeline(df, verbose=True, plot_confusion=True):
+def run_benchmark_pipeline(
+    df,
+    threshold=None,
+    verbose=True,
+    plot_confusion=True,
+):
     """Run the full ML benchmark pipeline.
 
     Args:
@@ -28,28 +33,31 @@ def run_pipeline(df, verbose=True, plot_confusion=True):
 
     results = {}
 
-    for name, model in models.items():
+    for name, model_cfg in models.items():
         if verbose:
             print("\n====================")
             print(f"MODEL: {name}")
             print("====================")
 
-        if name in PARAM_GRIDS:
-            model = search_model(
-                model,
-                PARAM_GRIDS[name],
-                X_train,
-                y_train,
-                tscv,
-                verbose=verbose,
-            )
+        builder = model_cfg["builder"]
+        param_space = model_cfg["param_space"]
+
+        model = search_model_optuna(
+            model_builder=builder,
+            param_space_fn=param_space,
+            X=X_train,
+            y=y_train,
+            tscv=tscv,
+            n_trials=N_TRIALS,
+            verbose=verbose,
+        )
 
         metrics = benchmark_model(
             model,
             X_train,
             y_train,
             tscv,
-            threshold=THRESHOLD,
+            threshold=threshold,
             verbose=verbose,
             plot_confusion=plot_confusion,
         )

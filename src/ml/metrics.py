@@ -1,7 +1,6 @@
 """Evaluation metrics and visualization utilities for classification models."""
 
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 from sklearn.metrics import (
     average_precision_score,
@@ -43,18 +42,6 @@ def calculate_metrics(y_true, y_pred, y_proba=None):
         metrics["pr_auc"] = average_precision_score(y_true, y_proba)
 
     return metrics
-
-
-def calculate_means(metrics_list):
-    """Compute mean values of metrics across folds.
-
-    Args:
-        metrics_list: List of metric dictionaries.
-
-    Returns:
-        Dictionary of averaged metrics.
-    """
-    return {key: float(np.nanmean([m[key] for m in metrics_list])) for key in metrics_list[0]}
 
 
 def plot_confusion_matrix(y_true, y_pred, title="Confusion Matrix"):

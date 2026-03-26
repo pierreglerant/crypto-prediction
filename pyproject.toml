@@ -53,7 +53,7 @@ extend-select = [
 ]
 per-file-ignores = {
     "src/ml/data.py" = ["N803"],
-    "src/ml/pipeline.py" = ["N806"],
+    "src/pipelines/ml_benchmark.py" = ["N806"],
     "src/ml/training.py" = ["N803", "N806"],
 }
 
