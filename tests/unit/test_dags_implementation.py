@@ -24,6 +24,97 @@ class _FakeTaskInstance:
         self.calls.append((key, value))
 
 
+_GDELT_CALLS: dict[str, list[dict[str, object]]] = {}
+
+
+def _reset_gdelt_calls() -> dict[str, list[dict[str, object]]]:
+    calls = {
+        "bronze": [],
+        "silver": [],
+        "gold": [],
+        "tone_bronze": [],
+        "tone_silver": [],
+        "tone_gold": [],
+        "merge": [],
+    }
+    _GDELT_CALLS.clear()
+    _GDELT_CALLS.update(calls)
+    return calls
+
+
+class _FakeBronzeLayer:
+    def __init__(self, coin_name, query_terms):
+        self.coin_name = coin_name
+        self.query_terms = query_terms
+        self.output_jsonl = "/tmp/gdelt_bronze.jsonl"
+        _GDELT_CALLS["bronze"].append({"coin_name": coin_name, "query_terms": query_terms})
+
+    def run(self, fetch_missing=False):
+        _GDELT_CALLS["bronze"][-1]["fetch_missing"] = fetch_missing
+
+
+class _FakeSilverLayer:
+    def __init__(self, coin_name):
+        self.coin_name = coin_name
+        self.output_csv = "/tmp/gdelt_silver.csv"
+        _GDELT_CALLS["silver"].append({"coin_name": coin_name})
+
+    def run(self):
+        return None
+
+
+class _FakeGoldLayer:
+    def __init__(self, coin_name, source_mappings=None):
+        self.coin_name = coin_name
+        self.source_mappings = source_mappings
+        self.output_csv = "/tmp/gdelt_gold.csv"
+        _GDELT_CALLS["gold"].append({"coin_name": coin_name, "source_mappings": source_mappings})
+
+    def run(self):
+        return None
+
+
+class _FakeToneBronzeLayer:
+    def __init__(self, coin_name, input_csv=None, output_jsonl=None):
+        self.coin_name = coin_name
+        self.input_csv = input_csv
+        self.output_jsonl = "/tmp/gdelt_tone_bronze.jsonl"
+        _GDELT_CALLS["tone_bronze"].append({"coin_name": coin_name, "input_csv": input_csv})
+
+    def run(self):
+        return None
+
+
+class _FakeToneSilverLayer:
+    def __init__(self, coin_name, input_file=None, output_csv=None):
+        self.coin_name = coin_name
+        self.output_csv = "/tmp/gdelt_tone_silver.csv"
+        _GDELT_CALLS["tone_silver"].append({"coin_name": coin_name})
+
+    def run(self):
+        return None
+
+
+class _FakeToneGoldLayer:
+    def __init__(self, coin_name, input_csv=None, output_csv=None):
+        self.coin_name = coin_name
+        self.output_csv = "/tmp/gdelt_tone_gold.csv"
+        _GDELT_CALLS["tone_gold"].append({"coin_name": coin_name})
+
+    def run(self):
+        return None
+
+
+class _FakeMergeLayer:
+    def __init__(self, coin_name, media_gold_csv=None, tone_gold_csv=None, output_csv=None):
+        self.coin_name = coin_name
+        self.output_csv = "/tmp/gdelt_gold_with_tone.csv"
+        _GDELT_CALLS["merge"].append({"coin_name": coin_name})
+
+    def run(self):
+        return None
+
+
 def test_btc_market_dag_structure_and_task_callables(monkeypatch) -> None:
     """`btc_market_dag` should wire bronze -> silver -> gold and call the stage helpers."""
     module = _load_module("btc_market_dag_test", "btc_market_dag.py")
@@ -150,8 +241,8 @@ def test_eth_market_dag_structure_and_task_callables(monkeypatch) -> None:
     ]
 
 
-def test_gdelt_media_dag_structure_and_task_callables(monkeypatch) -> None:
-    """`gdelt_media_dag` should wire bronze -> silver -> gold and tone tasks, then parse runtime variables."""
+def test_gdelt_media_dag_structure() -> None:
+    """`gdelt_media_dag` should wire bronze -> silver -> gold and tone tasks."""
     module = _load_module("gdelt_media_dag_test", "gdelt_media_dag.py")
 
     assert module.dag.dag_id == "gdelt_media_pipeline"
@@ -165,71 +256,10 @@ def test_gdelt_media_dag_structure_and_task_callables(monkeypatch) -> None:
     assert module.dag.get_task("merge_gold_tone").downstream_task_ids == set()
     assert module.dag.get_task("bronze").pool == "gdelt_api_pool"
 
-    class FakeBronzeLayer:
-        def __init__(self, coin_name, query_terms):
-            self.coin_name = coin_name
-            self.query_terms = query_terms
-            self.output_jsonl = "/tmp/gdelt_bronze.jsonl"
-            bronze_calls.append({"coin_name": coin_name, "query_terms": query_terms})
 
-        def run(self, fetch_missing=False):
-            bronze_calls[-1]["fetch_missing"] = fetch_missing
-
-    class FakeSilverLayer:
-        def __init__(self, coin_name):
-            self.coin_name = coin_name
-            self.output_csv = "/tmp/gdelt_silver.csv"
-            silver_calls.append({"coin_name": coin_name})
-
-        def run(self):
-            return None
-
-    class FakeGoldLayer:
-        def __init__(self, coin_name, source_mappings=None):
-            self.coin_name = coin_name
-            self.source_mappings = source_mappings
-            self.output_csv = "/tmp/gdelt_gold.csv"
-            gold_calls.append({"coin_name": coin_name, "source_mappings": source_mappings})
-
-        def run(self):
-            return None
-
-    class FakeToneBronzeLayer:
-        def __init__(self, coin_name, input_csv=None, output_jsonl=None):
-            self.coin_name = coin_name
-            self.input_csv = input_csv
-            self.output_jsonl = "/tmp/gdelt_tone_bronze.jsonl"
-            tone_bronze_calls.append({"coin_name": coin_name, "input_csv": input_csv})
-
-        def run(self):
-            return None
-
-    class FakeToneSilverLayer:
-        def __init__(self, coin_name, input_file=None, output_csv=None):
-            self.coin_name = coin_name
-            self.output_csv = "/tmp/gdelt_tone_silver.csv"
-            tone_silver_calls.append({"coin_name": coin_name})
-
-        def run(self):
-            return None
-
-    class FakeToneGoldLayer:
-        def __init__(self, coin_name, input_csv=None, output_csv=None):
-            self.coin_name = coin_name
-            self.output_csv = "/tmp/gdelt_tone_gold.csv"
-            tone_gold_calls.append({"coin_name": coin_name})
-
-        def run(self):
-            return None
-
-    class FakeMergeLayer:
-        def __init__(self, coin_name, media_gold_csv=None, tone_gold_csv=None, output_csv=None):
-            self.coin_name = coin_name
-            self.output_csv = "/tmp/gdelt_gold_with_tone.csv"
-            merge_calls.append({"coin_name": coin_name})
-
-        def run(self):
-            return None
+def test_gdelt_media_dag_task_callables_and_runtime_parsing(monkeypatch) -> None:
+    """`gdelt_media_dag` task callables should parse runtime variables and execute stage layers."""
+    module = _load_module("gdelt_media_dag_test_runtime", "gdelt_media_dag.py")
 
     monkeypatch.setattr(
         module,
@@ -242,21 +272,15 @@ def test_gdelt_media_dag_structure_and_task_callables(monkeypatch) -> None:
         }.get(key, default),
     )
 
-    bronze_calls = []
-    silver_calls = []
-    gold_calls = []
-    tone_bronze_calls = []
-    tone_silver_calls = []
-    tone_gold_calls = []
-    merge_calls = []
+    calls = _reset_gdelt_calls()
 
-    monkeypatch.setattr(module, "BronzeLayer", FakeBronzeLayer)
-    monkeypatch.setattr(module, "SilverLayer", FakeSilverLayer)
-    monkeypatch.setattr(module, "GoldLayer", FakeGoldLayer)
-    monkeypatch.setattr(module, "ToneBronzeLayer", FakeToneBronzeLayer)
-    monkeypatch.setattr(module, "ToneSilverLayer", FakeToneSilverLayer)
-    monkeypatch.setattr(module, "ToneGoldLayer", FakeToneGoldLayer)
-    monkeypatch.setattr(module, "GoldToneMergeLayer", FakeMergeLayer)
+    monkeypatch.setattr(module, "BronzeLayer", _FakeBronzeLayer)
+    monkeypatch.setattr(module, "SilverLayer", _FakeSilverLayer)
+    monkeypatch.setattr(module, "GoldLayer", _FakeGoldLayer)
+    monkeypatch.setattr(module, "ToneBronzeLayer", _FakeToneBronzeLayer)
+    monkeypatch.setattr(module, "ToneSilverLayer", _FakeToneSilverLayer)
+    monkeypatch.setattr(module, "ToneGoldLayer", _FakeToneGoldLayer)
+    monkeypatch.setattr(module, "GoldToneMergeLayer", _FakeMergeLayer)
 
     ti = _FakeTaskInstance()
 
@@ -268,13 +292,13 @@ def test_gdelt_media_dag_structure_and_task_callables(monkeypatch) -> None:
     module.task_tone_gold(ti=ti)
     module.task_merge_gold_tone(ti=ti)
 
-    assert bronze_calls == [{"coin_name": "bitcoin", "query_terms": ["bitcoin", "btc"], "fetch_missing": True}]
-    assert silver_calls == [{"coin_name": "bitcoin"}]
-    assert gold_calls == [{"coin_name": "bitcoin", "source_mappings": {"reuters.com": "Reuters", "cnn.com": "CNN"}}]
-    assert tone_bronze_calls == [{"coin_name": "bitcoin", "input_csv": None}]
-    assert tone_silver_calls == [{"coin_name": "bitcoin"}]
-    assert tone_gold_calls == [{"coin_name": "bitcoin"}]
-    assert merge_calls == [{"coin_name": "bitcoin"}]
+    assert calls["bronze"] == [{"coin_name": "bitcoin", "query_terms": ["bitcoin", "btc"], "fetch_missing": True}]
+    assert calls["silver"] == [{"coin_name": "bitcoin"}]
+    assert calls["gold"] == [{"coin_name": "bitcoin", "source_mappings": {"reuters.com": "Reuters", "cnn.com": "CNN"}}]
+    assert calls["tone_bronze"] == [{"coin_name": "bitcoin", "input_csv": None}]
+    assert calls["tone_silver"] == [{"coin_name": "bitcoin"}]
+    assert calls["tone_gold"] == [{"coin_name": "bitcoin"}]
+    assert calls["merge"] == [{"coin_name": "bitcoin"}]
     assert ti.calls == [
         ("bronze_output", "/tmp/gdelt_bronze.jsonl"),
         ("silver_output", "/tmp/gdelt_silver.csv"),
