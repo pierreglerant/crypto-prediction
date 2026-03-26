@@ -40,11 +40,12 @@ python3 pipeline_runner.py
 
 ## Airflow Orchestration
 
-The repository now includes an Airflow DAG for the GDELT pipeline:
+The repository now includes Airflow DAGs for the GDELT pipeline:
 
 - DAG file: `dags/gdelt_media_dag.py`
 - DAG ID: `gdelt_media_dag`
 - Schedule: daily at `02:00` (UTC)
+- Additional DAG files: `dags/gdelt_media_eth_dag.py`, `dags/gdelt_media_xrp_dag.py`, `dags/gdelt_media_ltc_dag.py`, `dags/gdelt_media_bch_dag.py`, `dags/gdelt_media_ada_dag.py`, `dags/gdelt_media_doge_dag.py`
 
 ### Start Airflow
 
@@ -68,6 +69,8 @@ Configure variables from Airflow UI (`Admin -> Variables`):
 - `GDELT_QUERY_TERMS` (default: `bitcoin,btc`)
 - `GDELT_FETCH_MISSING` (`true` or `false`, default: `false`)
 - `GDELT_SOURCE_MAPPINGS_JSON` (optional JSON object)
+
+Coin-specific variables follow the same pattern, for example `GDELT_XRP_COIN`, `GDELT_XRP_QUERY_TERMS`, `GDELT_XRP_FETCH_MISSING`, and `GDELT_XRP_SOURCE_MAPPINGS_JSON`.
 
 Example for source mappings:
 

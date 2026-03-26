@@ -52,6 +52,7 @@ def run_market_bronze_task(
     context,
     variable_getter,
     coin_symbol: str,
+    market_symbol: str,
     default_interval: str,
     default_start_date: str,
     fetch_full_history,
@@ -62,7 +63,7 @@ def run_market_bronze_task(
     """Execute the market bronze step and push the output path to XCom."""
     interval = get_airflow_variable(variable_getter, f"{coin_symbol}_INTERVAL", default_interval).strip()
     start_date = get_airflow_variable(variable_getter, f"{coin_symbol}_START_DATE", default_start_date).strip()
-    symbol = get_airflow_variable(variable_getter, f"{coin_symbol}_SYMBOL", coin_symbol).strip().upper()
+    symbol = get_airflow_variable(variable_getter, f"{coin_symbol}_SYMBOL", market_symbol).strip().upper()
 
     raw_data = fetch_full_history(symbol, interval, start_date)
     save_data(raw_data, "bronze", symbol=artifact_symbol, interval=interval, suffix="_raw", is_json=True)
@@ -151,13 +152,9 @@ def run_gdelt_gold_task(*, context, coin_name: str, source_mappings_var: str, va
     context["ti"].xcom_push(key="gold_output", value=layer.output_csv)
 
 
-def run_gdelt_tone_bronze_task(*, context, coin_name: str, tone_input_var: str | None, variable_getter, tone_bronze_layer) -> None:
+def run_gdelt_tone_bronze_task(*, context, coin_name: str, variable_getter, tone_bronze_layer) -> None:
     """Execute the tone bronze step and push the output path to XCom."""
-    tone_input_csv = None
-    if tone_input_var:
-        tone_input_csv = get_airflow_variable(variable_getter, tone_input_var, "").strip() or None
-
-    layer = tone_bronze_layer(coin_name, input_csv=tone_input_csv)
+    layer = tone_bronze_layer(coin_name)
     layer.run()
     context["ti"].xcom_push(key="tone_bronze_output", value=layer.output_jsonl)
 

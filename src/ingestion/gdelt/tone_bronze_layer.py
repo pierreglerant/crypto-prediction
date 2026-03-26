@@ -47,10 +47,9 @@ class ToneBronzeLayer:
         self.default_input_candidates = [self.cache_csv]
 
         if input_csv:
-            self.input_csv = str(input_csv)
-        else:
-            existing_default = next((path for path in self.default_input_candidates if path.exists()), self.cache_csv)
-            self.input_csv = str(existing_default)
+            print("⚠️ tone_bronze input_csv is deprecated; using the 1d cache file instead.")
+
+        self.input_csv = str(self.cache_csv)
 
         self.output_jsonl = str(output_jsonl) if output_jsonl else str(bronze_dir / f"{coin_name}_tone_bronze.jsonl")
 
@@ -58,7 +57,7 @@ class ToneBronzeLayer:
         self.rows_skipped = 0
 
     def _resolve_input_path(self) -> Path:
-        """Return the configured tone CSV or the first available local fallback."""
+        """Return the 1d cache CSV or populate it from BigQuery if needed."""
         input_path = Path(self.input_csv)
         if input_path.exists():
             return input_path

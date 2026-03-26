@@ -1,6 +1,6 @@
-"""Airflow DAG for Ethereum GDELT media pipeline (bronze -> silver -> gold)."""
+"""Airflow DAG for Dogecoin GDELT media pipeline (bronze -> silver -> gold)."""
 
-from src.config.coins import ETH_GDELT
+from src.config.coins import DOGE_GDELT
 from src.ingestion.gdelt.bronze_layer import BronzeLayer
 from src.ingestion.gdelt.tone_bronze_layer import ToneBronzeLayer
 from src.pipelines.airflow_dag_factory import build_gdelt_dag
@@ -12,7 +12,7 @@ from src.processing.media.silver_tone_layer import ToneSilverLayer
 
 
 dag = build_gdelt_dag(
-    config=ETH_GDELT,
+    config=DOGE_GDELT,
     BronzeLayer=BronzeLayer,
     SilverLayer=SilverLayer,
     GoldLayer=GoldLayer,

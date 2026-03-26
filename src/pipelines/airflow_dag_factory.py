@@ -74,6 +74,7 @@ def build_market_dag(*, config: Any, fetch_full_history, klines_to_dataframe, bu
             context=context,
             variable_getter=_get_variable,
             coin_symbol=config.variable_prefix,
+            market_symbol=config.market_symbol,
             default_interval=config.default_interval,
             default_start_date=config.default_start_date,
             fetch_full_history=fetch_full_history,
@@ -211,7 +212,6 @@ def build_gdelt_dag(
                 run_gdelt_tone_bronze_task(
                     context=context,
                     coin_name=config.coin_name,
-                    tone_input_var=config.tone_input_var,
                     variable_getter=_get_variable,
                     tone_bronze_layer=ToneBronzeLayer,
                 )
