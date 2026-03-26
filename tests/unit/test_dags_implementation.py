@@ -245,7 +245,7 @@ def test_gdelt_media_dag_structure() -> None:
     """`gdelt_media_dag` should wire bronze -> silver -> gold and tone tasks."""
     module = _load_module("gdelt_media_dag_test", "gdelt_media_dag.py")
 
-    assert module.dag.dag_id == "gdelt_media_pipeline"
+    assert module.dag.dag_id == "gdelt_media_dag"
     assert set(module.dag.task_dict) == {"bronze", "silver", "gold", "tone_bronze", "tone_silver", "tone_gold", "merge_gold_tone"}
     assert module.dag.get_task("bronze").downstream_task_ids == {"silver"}
     assert module.dag.get_task("silver").downstream_task_ids == {"gold"}
