@@ -25,10 +25,12 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,airflow]"
 
       - name: Pre-commit (Ruff lint + fix check, format)
         run: pre-commit run --all-files
 
       - name: Pytest
         run: pytest -q
+
+  
