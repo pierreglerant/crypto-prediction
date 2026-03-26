@@ -32,10 +32,10 @@ if str(REPO_ROOT) not in sys.path:
 from src.ingestion.gdelt.bronze_layer import BronzeLayer  # noqa: E402
 from src.ingestion.gdelt.tone_bronze_layer import ToneBronzeLayer  # noqa: E402
 from src.processing.media.gold_layer import GoldLayer  # noqa: E402
+from src.processing.media.gold_tone_layer import ToneGoldLayer  # noqa: E402
 from src.processing.media.gold_tone_merge_layer import GoldToneMergeLayer  # noqa: E402
 from src.processing.media.silver_layer import SilverLayer  # noqa: E402
-from src.processing.media.tone_gold_layer import ToneGoldLayer  # noqa: E402
-from src.processing.media.tone_silver_layer import ToneSilverLayer  # noqa: E402
+from src.processing.media.silver_tone_layer import ToneSilverLayer  # noqa: E402
 
 
 def _get_variable(key: str, default: str) -> str:

@@ -88,19 +88,19 @@ class ToneGoldLayer:
                 "date": row["date"],
                 "avg_tone": row["avg_tone"],
                 "article_count": row["article_count"],
-                "tone_ma_3": self._rolling_mean(rows, idx, "avg_tone", 3),
                 "tone_ma_7": self._rolling_mean(rows, idx, "avg_tone", 7),
+                "tone_ma_30": self._rolling_mean(rows, idx, "avg_tone", 30),
                 "tone_lag_1": self._lag(rows, idx, "avg_tone", 1),
-                "tone_lag_3": self._lag(rows, idx, "avg_tone", 3),
+                "tone_lag_7": self._lag(rows, idx, "avg_tone", 7),
                 "article_count_ma_3": self._rolling_mean(rows, idx, "article_count", 3),
                 "article_count_lag_1": self._lag(rows, idx, "article_count", 1),
             }
 
             required = [
-                "tone_ma_3",
                 "tone_ma_7",
+                "tone_ma_30",
                 "tone_lag_1",
-                "tone_lag_3",
+                "tone_lag_7",
                 "article_count_ma_3",
                 "article_count_lag_1",
             ]
@@ -130,10 +130,10 @@ class ToneGoldLayer:
                 "date",
                 "avg_tone",
                 "article_count",
-                "tone_ma_3",
                 "tone_ma_7",
+                "tone_ma_30",
                 "tone_lag_1",
-                "tone_lag_3",
+                "tone_lag_7",
                 "article_count_ma_3",
                 "article_count_lag_1",
             ]
