@@ -125,9 +125,7 @@ def run_gdelt_bronze_task(
     bronze_layer,
 ) -> None:
     """Execute the GDELT bronze step and push the output path to XCom."""
-    query_terms = parse_csv_terms(
-        get_airflow_variable(variable_getter, coin_variable.replace("COIN", "QUERY_TERMS"), ",".join(default_query_terms))
-    )
+    query_terms = parse_csv_terms(get_airflow_variable(variable_getter, coin_variable.replace("COIN", "QUERY_TERMS"), ",".join(default_query_terms)))
     fetch_missing = get_airflow_variable(variable_getter, fetch_missing_var, "false").lower() == "true"
 
     layer = bronze_layer(coin_name, query_terms)

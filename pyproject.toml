@@ -59,6 +59,7 @@ extend-select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"src/pipelines/airflow_dag_factory.py" = ["N803"]
 "src/ml/data.py" = ["N803"]
 "src/pipelines/ml_benchmark.py" = ["N806"]
 "src/ml/training.py" = ["N803", "N806"]

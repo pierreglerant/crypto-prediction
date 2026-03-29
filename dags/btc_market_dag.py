@@ -7,7 +7,6 @@ from src.processing.btc.gold import build_gold_features
 from src.processing.btc.silver import klines_to_dataframe
 from src.utils.io import save_data
 
-
 dag = build_market_dag(
     config=BTC_MARKET,
     fetch_full_history=fetch_full_history,

@@ -1,8 +1,7 @@
 """Google Cloud configuration helpers and BigQuery query templates.
 
-This module is intentionally local-first for now: it stores placeholders for
-future BigQuery integration, but it does not require cloud credentials to run
-the current pipeline.
+This module centralizes the BigQuery settings and SQL builders used by the
+GDELT pipeline so the DAGs can run without any GDELT API calls.
 """
 
 from __future__ import annotations
@@ -10,6 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from os import getenv
 from pathlib import Path
+
+
+def _escape_sql_literal(value: str) -> str:
+    """Escape a string for safe embedding in a SQL LIKE literal."""
+    return value.replace("'", "''")
 
 
 @dataclass(frozen=True)
@@ -61,4 +65,38 @@ GROUP BY
   jour
 ORDER BY
   jour;
+""".strip()
+
+
+def build_daily_article_cache_query(query_terms: list[str] | tuple[str, ...], start_date: str | None = None, end_date: str | None = None) -> str:
+    """Build the BigQuery SQL for a daily article cache.
+
+    The query extracts article URLs and publication days from the GKG table so
+    the bronze layer can materialize the local article cache without using the
+    GDELT DOC API.
+    """
+    cleaned_terms = [term.strip().lower() for term in query_terms if term and term.strip()]
+    if not cleaned_terms:
+        raise ValueError("At least one query term is required")
+
+    term_predicates = [f"LOWER(COALESCE(V2Themes, '')) LIKE '%{_escape_sql_literal(term)}%'" for term in cleaned_terms]
+
+    date_clause = ""
+    if start_date and end_date:
+        start_key = start_date.replace("-", "")
+        end_key = end_date.replace("-", "")
+        date_clause = f"  AND DATE BETWEEN {start_key}000000 AND {end_key}235959\n"
+
+    return f"""
+SELECT
+  SUBSTR(CAST(DATE AS STRING), 1, 8) AS day,
+  DocumentIdentifier AS url
+FROM
+  `gdelt-bq.gdeltv2.gkg`
+WHERE
+  DocumentIdentifier IS NOT NULL
+  AND ({" OR ".join(term_predicates)})
+{date_clause}ORDER BY
+  day,
+  url;
 """.strip()

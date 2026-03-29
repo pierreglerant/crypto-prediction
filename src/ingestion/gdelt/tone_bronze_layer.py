@@ -20,6 +20,13 @@ try:
 except ImportError:  # pragma: no cover - optional dependency for local mode
     bigquery = None
 
+try:
+    import google.auth
+except ImportError:  # pragma: no cover - optional dependency for local mode
+    google_auth = None
+else:
+    google_auth = google.auth
+
 
 class ToneBronzeLayer:
     """Load daily tone/count data from CSV and normalize basic schema."""
@@ -77,24 +84,30 @@ class ToneBronzeLayer:
         The cache is written in the local schema expected by the pipeline:
         `day`, `avg_tone`, `article_count`.
         """
-
         if bigquery is None:
             print("⚠️ BigQuery client unavailable; install google-cloud-bigquery to enable fallback.")
             return False
 
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip() or None
-        location = os.getenv("BIGQUERY_LOCATION", "EU").strip() or "EU"
-        credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip() or None
-
-        if not project_id and not credentials_path:
-            print("⚠️ BigQuery fallback skipped: configure GOOGLE_CLOUD_PROJECT or GOOGLE_APPLICATION_CREDENTIALS.")
-            return False
-
         try:
-            if credentials_path:
-                client = bigquery.Client.from_service_account_json(credentials_path, project=project_id)
+            settings = {
+                "project_id": os.getenv("GOOGLE_CLOUD_PROJECT", "").strip() or None,
+                "location": os.getenv("BIGQUERY_LOCATION", "EU").strip() or "EU",
+                "credentials_path": os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip() or None,
+            }
+
+            if google_auth is None:
+                raise RuntimeError("google-auth is not installed")
+
+            if settings["credentials_path"]:
+                credentials, detected_project = google_auth.load_credentials_from_file(
+                    settings["credentials_path"],
+                    scopes=["https://www.googleapis.com/auth/bigquery"],
+                )
             else:
-                client = bigquery.Client(project=project_id, location=location)
+                credentials, detected_project = google_auth.default(scopes=["https://www.googleapis.com/auth/bigquery"])
+
+            project_id = settings["project_id"] or detected_project
+            client = bigquery.Client(credentials=credentials, project=project_id, location=settings["location"])
         except Exception as exc:
             print(f"⚠️ BigQuery client initialization failed: {exc}")
             return False
@@ -102,7 +115,7 @@ class ToneBronzeLayer:
         print("⚠️ Cache CSV missing, querying BigQuery as fallback (cost may apply)...")
 
         try:
-            query_job = client.query(self.bigquery_query, location=location)
+            query_job = client.query(self.bigquery_query, location=settings["location"])
             rows = query_job.result()
             with open(cache_path, "w", newline="", encoding="utf-8") as outfile:
                 writer = csv.DictWriter(outfile, fieldnames=["day", "avg_tone", "article_count"])

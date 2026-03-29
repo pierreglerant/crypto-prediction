@@ -10,7 +10,6 @@ from src.processing.media.gold_tone_merge_layer import GoldToneMergeLayer
 from src.processing.media.silver_layer import SilverLayer
 from src.processing.media.silver_tone_layer import ToneSilverLayer
 
-
 dag = build_gdelt_dag(
     config=ETH_GDELT,
     BronzeLayer=BronzeLayer,

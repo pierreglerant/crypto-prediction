@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 
 
@@ -135,6 +134,34 @@ def test_eth_market_dag_structure_and_task_callables(monkeypatch) -> None:
     assert module.dag.get_task("bronze").downstream_task_ids == {"silver"}
     assert module.dag.get_task("silver").downstream_task_ids == {"gold"}
     assert module.dag.get_task("gold").downstream_task_ids == set()
+
+
+def test_market_share_dag_structure() -> None:
+    """`market_share_dag` should fan out across all coins and fan in to one aggregation task."""
+    module = _load_module("market_share_dag_test", "market_share_dag.py")
+
+    assert module.dag.dag_id == "market_share_pipeline"
+    assert set(module.dag.task_dict) == {
+        "fetch_btc_usdt",
+        "fetch_eth_usdt",
+        "fetch_xrp_usdt",
+        "fetch_ltc_usdt",
+        "fetch_bch_usdt",
+        "fetch_ada_usdt",
+        "fetch_doge_usdt",
+        "aggregate",
+    }
+    for task_id in [
+        "fetch_btc_usdt",
+        "fetch_eth_usdt",
+        "fetch_xrp_usdt",
+        "fetch_ltc_usdt",
+        "fetch_bch_usdt",
+        "fetch_ada_usdt",
+        "fetch_doge_usdt",
+    ]:
+        assert module.dag.get_task(task_id).downstream_task_ids == {"aggregate"}
+    assert module.dag.get_task("aggregate").downstream_task_ids == set()
 
 
 def test_gdelt_media_dag_structure() -> None:

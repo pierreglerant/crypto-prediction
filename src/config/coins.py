@@ -109,6 +109,16 @@ DOGE_MARKET = MarketCoinConfig(
     tags=("doge", "market", "binance", "etl"),
 )
 
+MARKET_COINS: tuple[MarketCoinConfig, ...] = (
+    BTC_MARKET,
+    ETH_MARKET,
+    XRP_MARKET,
+    LTC_MARKET,
+    BCH_MARKET,
+    ADA_MARKET,
+    DOGE_MARKET,
+)
+
 BTC_GDELT = GdeltCoinConfig(
     coin_name="bitcoin",
     variable_prefix="GDELT",
