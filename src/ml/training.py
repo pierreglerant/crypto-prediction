@@ -51,7 +51,7 @@ def benchmark_model(
         plot_confusion: Whether to display confusion matrix.
 
     Returns:
-        Dictionary of averaged metrics.
+        Dictionary of evaluation metrics computed on global OOF predictions.
     """
     y_true_all = []
     y_proba_all = []
@@ -62,7 +62,6 @@ def benchmark_model(
         y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
         model.fit(X_tr, y_tr)
-
         y_proba = model.predict_proba(X_val)[:, 1]
 
         y_true_all.extend(y_val)
@@ -80,7 +79,6 @@ def benchmark_model(
 
     # Step 3 — Apply threshold and compute metrics
     y_pred_all = (y_proba_all > threshold).astype(int)
-
     metrics = calculate_metrics(y_true_all, y_pred_all, y_proba_all)
 
     if verbose:
@@ -105,7 +103,7 @@ def search_model_optuna(
 ):
     """Perform hyperparameter search using Optuna (Bayesian optimization).
 
-    Optimizes PR-AUC (threshold-independent metric).
+    Optimizes global OOF PR-AUC for consistency with benchmark_model.
 
     Args:
         model_builder: Callable(params) -> model instance.
@@ -122,27 +120,38 @@ def search_model_optuna(
 
     def objective(trial):
         params = param_space_fn(trial)
-        model = model_builder(**params)
 
-        scores = []
+        y_true_all = []
+        y_proba_all = []
 
         for fold, (train_idx, val_idx) in enumerate(tscv.split(X)):
+            model = model_builder(**params)
+
             X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
             y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
             model.fit(X_tr, y_tr)
-
             y_proba = model.predict_proba(X_val)[:, 1]
-            score = average_precision_score(y_val, y_proba)
 
-            scores.append(score)
+            y_true_all.extend(y_val)
+            y_proba_all.extend(y_proba)
 
-            # Pruning
-            trial.report(np.mean(scores), step=fold)
+            current_score = average_precision_score(
+                np.array(y_true_all),
+                np.array(y_proba_all),
+            )
+
+            # Pruning based on current global OOF PR-AUC
+            trial.report(current_score, step=fold)
             if trial.should_prune():
                 raise optuna.exceptions.TrialPruned()
 
-        return np.mean(scores)
+        final_score = average_precision_score(
+            np.array(y_true_all),
+            np.array(y_proba_all),
+        )
+
+        return final_score
 
     study = optuna.create_study(
         direction="maximize",
