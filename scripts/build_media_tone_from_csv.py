@@ -16,9 +16,8 @@ import argparse
 import csv
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
-
 
 SKIPPED_COINS = {"bitcoin_cash", "bch"}
 COIN_ALIASES = {
@@ -163,6 +162,33 @@ def aggregate_rows(rows: list[DailyToneRow]) -> dict[str, list[DailyToneRow]]:
     return normalized
 
 
+def fill_date_gaps(rows: list[DailyToneRow], crypto: str) -> list[DailyToneRow]:
+    """Fill missing days in a per-coin series with article_count=0, avg_tone=0.0.
+
+    Days without media coverage are treated as silent days (no articles published,
+    neutral tone). This ensures a continuous daily series so that rolling means and
+    lags are computed on the correct calendar distances rather than across gaps.
+    """
+    if not rows:
+        return rows
+
+    by_date = {row.date: row for row in rows}
+    first = date.fromisoformat(min(by_date))
+    last = date.fromisoformat(max(by_date))
+
+    filled: list[DailyToneRow] = []
+    current = first
+    while current <= last:
+        day_str = current.isoformat()
+        if day_str in by_date:
+            filled.append(by_date[day_str])
+        else:
+            filled.append(DailyToneRow(date=day_str, crypto=crypto, article_count=0, avg_tone=0.0))
+        current += timedelta(days=1)
+
+    return filled
+
+
 def rolling_mean(values: list[float], idx: int, window: int) -> float | None:
     """Return the trailing rolling mean ending at idx."""
     start_idx = idx - window + 1
@@ -183,21 +209,25 @@ def lag(values: list[float], idx: int, lag_size: int) -> float | None:
 
 
 def write_silver(output_path: Path, rows: list[DailyToneRow]) -> None:
-    """Write the cleaned daily summary rows."""
+    """Write the cleaned daily summary rows, with gap days filled as zero-coverage."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    crypto = rows[0].crypto if rows else ""
+    filled = fill_date_gaps(rows, crypto)
 
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=["date", "avg_tone", "article_count"])
         writer.writeheader()
-        for row in rows:
+        for row in filled:
             writer.writerow({"date": row.date, "avg_tone": row.avg_tone, "article_count": row.article_count})
 
 
 def write_gold(output_path: Path, rows: list[DailyToneRow]) -> None:
-    """Write enriched tone features for one coin."""
+    """Write enriched tone features for one coin, with gap days filled as zero-coverage."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ordered_rows = sorted(rows, key=lambda item: item.date)
+    crypto = rows[0].crypto if rows else ""
+    ordered_rows = fill_date_gaps(sorted(rows, key=lambda item: item.date), crypto)
     avg_tones = [row.avg_tone for row in ordered_rows]
     article_counts = [row.article_count for row in ordered_rows]
 
