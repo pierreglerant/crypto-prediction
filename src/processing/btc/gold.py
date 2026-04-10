@@ -67,8 +67,8 @@ def build_gold_features(df: pd.DataFrame) -> pd.DataFrame:
     # Future drawdown relative to today
     df["future_drawdown"] = df["future_min"] / df["close"] - 1
 
-    # Binary risk target: crash if drop > 10%
-    df["target"] = (df["future_drawdown"] < drop_threshold).astype(int)
+    # Binary risk target: crash if drop > 10% (boolean dtype for downstream ML / parity with tests)
+    df["target"] = df["future_drawdown"] < drop_threshold
 
     # =========================
     # CLEANING
