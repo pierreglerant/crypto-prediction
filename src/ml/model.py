@@ -21,7 +21,7 @@ def build_logistic(**params):
     """Logistic Regression without preprocessing."""
     return LogisticRegression(
         class_weight="balanced",
-        max_iter=1000,
+        max_iter=5000,
         **params,
     )
 
@@ -76,16 +76,20 @@ def dummy_param_space(trial):
 
 
 def logistic_param_space(trial):
-    """Hyperparameter space for Logistic Regression."""
-    penalty = trial.suggest_categorical("penalty", ["l1", "l2"])
+    """Hyperparameter space for Logistic Regression.
+
+    sklearn 1.8+: use ``l1_ratio`` (0 = L2, 1 = L1); do not pass deprecated ``penalty``.
+    """
+    l1_ratio = trial.suggest_categorical("l1_ratio", [0.0, 1.0])
     solver = trial.suggest_categorical("solver", ["liblinear", "saga", "lbfgs"])
 
-    if penalty == "l1" and solver == "lbfgs":
+    # lbfgs supports only L2
+    if l1_ratio == 1.0 and solver == "lbfgs":
         raise optuna.exceptions.TrialPruned()
 
     return {
         "C": trial.suggest_float("C", 1e-4, 100.0, log=True),
-        "penalty": penalty,
+        "l1_ratio": l1_ratio,
         "solver": solver,
     }
 
