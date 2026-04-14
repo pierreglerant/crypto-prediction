@@ -60,6 +60,7 @@ def run_benchmark_pipeline(
             threshold=threshold,
             verbose=verbose,
             plot_confusion=plot_confusion,
+            model_name=name,
         )
 
         results[name] = metrics
