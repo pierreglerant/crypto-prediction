@@ -36,11 +36,17 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
     command: >
       bash -c "
       mkdir -p /opt/airflow/project/data/bronze /opt/airflow/project/data/silver /opt/airflow/project/data/gold &&
+      mkdir -p /opt/airflow/secrets &&
+      cp /home/airflow/.config/gcloud/legacy_credentials/herrahj@gmail.com/adc.json /opt/airflow/secrets/adc.json &&
       chown -R 50000:0 /opt/airflow/project/data &&
+      chown 50000:0 /opt/airflow/secrets/adc.json &&
       chmod -R g+rwX /opt/airflow/project/data &&
+      chmod 600 /opt/airflow/secrets/adc.json &&
       airflow db migrate &&
       airflow pools set gdelt_api_pool 1 'GDELT API rate limit' &&
       airflow users create --role Admin --username admin --password admin --firstname Air --lastname Flow --email admin@example.com || true
@@ -49,6 +55,8 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./:/opt/airflow/project
+      - ${HOME}/.config/gcloud:/home/airflow/.config/gcloud:ro
+      - gcp_secrets:/opt/airflow/secrets
     depends_on:
       db:
         condition: service_healthy
@@ -62,10 +70,13 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
     command: scheduler
     volumes:
       - ./dags:/opt/airflow/dags
       - ./:/opt/airflow/project
+      - gcp_secrets:/opt/airflow/secrets
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -81,13 +92,17 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
     command: webserver
     volumes:
       - ./dags:/opt/airflow/dags
       - ./:/opt/airflow/project
+      - gcp_secrets:/opt/airflow/secrets
     depends_on:
       airflow-init:
         condition: service_completed_successfully
 
 volumes:
   postgres_data:
+  gcp_secrets:

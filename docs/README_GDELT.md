@@ -40,11 +40,12 @@ python3 pipeline_runner.py
 
 ## Airflow Orchestration
 
-The repository now includes an Airflow DAG for the GDELT pipeline:
+The repository now includes Airflow DAGs for the GDELT pipeline:
 
 - DAG file: `dags/gdelt_media_dag.py`
-- DAG ID: `gdelt_media_pipeline`
+- DAG ID: `gdelt_media_dag`
 - Schedule: daily at `02:00` (UTC)
+- Additional DAG files: `dags/gdelt_media_eth_dag.py`, `dags/gdelt_media_xrp_dag.py`, `dags/gdelt_media_ltc_dag.py`, `dags/gdelt_media_bch_dag.py`, `dags/gdelt_media_ada_dag.py`, `dags/gdelt_media_doge_dag.py`
 
 ### Start Airflow
 
@@ -68,6 +69,8 @@ Configure variables from Airflow UI (`Admin -> Variables`):
 - `GDELT_QUERY_TERMS` (default: `bitcoin,btc`)
 - `GDELT_FETCH_MISSING` (`true` or `false`, default: `false`)
 - `GDELT_SOURCE_MAPPINGS_JSON` (optional JSON object)
+
+Coin-specific variables follow the same pattern, for example `GDELT_XRP_COIN`, `GDELT_XRP_QUERY_TERMS`, `GDELT_XRP_FETCH_MISSING`, and `GDELT_XRP_SOURCE_MAPPINGS_JSON`.
 
 Example for source mappings:
 
@@ -110,7 +113,7 @@ python3 gold_layer.py
 
 ## Input Format
 
-### CSV from BigQuery
+### Local-first article cache
 
 Expected columns:
 - `day` or `date` (YYYY-MM-DD or YYYYMMDD format)
@@ -127,6 +130,24 @@ File naming convention:
 - `{coin_name}_articles_bigquery.csv`
 
 Example: `bitcoin_articles_bigquery.csv`
+
+### Local-first tone summary
+
+The tone path is now **cache-first** and uses `data/cache/{coin_name}_tone_count_1d.csv` by default.
+If the cache is missing, the layer can fall back to BigQuery, fetch the daily tone/count aggregation,
+and persist it back to the same cache CSV format for reuse.
+
+Expected columns:
+- `date` or `day`
+- `avg_tone`
+- `article_count`
+
+The future BigQuery query is prepared with placeholders in `src/config/gcp.py` and can be enabled later with credentials such as:
+- `GOOGLE_CLOUD_PROJECT`
+- `BIGQUERY_DATASET`
+- `BIGQUERY_LOCATION`
+- `GOOGLE_APPLICATION_CREDENTIALS`
+- `GCP_SERVICE_ACCOUNT_JSON`
 
 ## Output Format
 
@@ -167,7 +188,7 @@ gold.run()
 All intermediate and cache files are in `.gitignore`:
 - `*_bronze.jsonl` - Raw enriched articles
 - `*_silver.csv` - Cleaned deduplicated data
-- `*_bigquery.csv` - Original BigQuery exports
+- `*_bigquery.csv` - Legacy BigQuery exports / fallback inputs
 - `*.json` - State files
 
 ## GDELT API Integration
@@ -230,4 +251,5 @@ Each cryptocurrency maintains separate cache files.
 - GDELT API historical limit: 3 months of rolling window
 - BigQuery export provides historical data (back to ~2015)
 - CSV cache files should be in `.gitignore` (not tracked in Git)
+- The tone summary is generated locally from the existing gold tone output; no manual `tone_count_1d.csv` export is required for the current mode
 - Pipeline is fully agnostic to cryptocurrency type
