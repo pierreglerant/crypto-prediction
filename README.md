@@ -1,305 +1,123 @@
-# 🚀 Crypto Data Platform
+# crypto-prediction
 
-A production-grade **Data Engineering project** that ingests, processes, and serves cryptocurrency market data.
-This project demonstrates how to build a **modular, scalable data platform** from raw API data to analytics-ready datasets and APIs.
-
----
-
-# 🧭 Overview
-
-The platform:
-
-* Collects crypto data from external APIs (CoinGecko, Binance)
-* Stores raw and processed data in a structured warehouse
-* Applies transformations (cleaning, feature engineering)
-* Exposes data via a REST API
-* (Optional) Supports ML and real-time streaming pipelines
+End-to-end pipeline for cryptocurrency crash-regime detection, combining market data, media signals, and cross-asset features. Built as an empirical study to assess whether external data sources improve prediction beyond a market-only baseline.
 
 ---
 
-# 🏗️ Project Architecture
+## What this project does
+
+1. **Ingests** daily OHLCV data from Binance and media data from GDELT
+2. **Processes** raw data through a Bronze → Silver → Gold pipeline
+3. **Engineers features** (returns, volatility, drawdown, buy pressure, media signals, cross-asset indicators)
+4. **Benchmarks** six model families (Logistic Regression, Random Forest, XGBoost, LightGBM, CatBoost, Dummy) with Bayesian hyperparameter optimization (Optuna)
+5. **Evaluates** under strict chronological train/test splits using PR-AUC as the primary metric
+
+The key finding: for BTC, a CatBoost model on 17 market features achieves PR-AUC = 0.771. Adding media or cross-asset features consistently degrades performance for both BTC and ETH.
+
+---
+
+## Project structure
 
 ```
-External APIs → Ingestion → Raw Storage → Transformations → Data Warehouse → API → Dashboard / ML
-```
+src/
+├── ingestion/        # Binance and GDELT API clients
+├── processing/       # Bronze → Silver → Gold pipelines (BTC, ETH, media)
+├── pipelines/        # ML benchmark pipeline
+├── ml/               # Models, training, metrics, config
+└── config/           # Global settings
 
----
+notebooks/
+├── eda/              # Exploratory analysis (01–07)
+└── benchmark/        # Model benchmarks (01–08)
 
-# 📂 Project Structure
+docs/
+├── paper_crypto_crash.tex        # Research paper (LaTeX)
+└── etude_predictibilite_crypto.md  # Study report (French)
 
-## 📦 `src/` — Core application code
-
-Python packages at the root of `src/` (`ingestion`, `pipelines`, `api`, etc.) contain the reusable business logic.
-
-### 🔹 `ingestion/`
-
-Handles data collection from external APIs.
-
-* API clients (CoinGecko, Binance)
-* Request handling, retries, parsing
-* Normalization of raw data
-
-👉 Example:
-
-```python
-coingecko_client.py
-binance_client.py
+dags/                 # Airflow DAGs for pipeline orchestration
+dbt/                  # dbt transformations
+tests/                # Unit and integration tests
 ```
 
 ---
 
-### 🔹 `pipelines/`
+## Notebooks
 
-Contains the **ETL logic**.
+### EDA
+| Notebook | Content |
+|----------|---------|
+| `01_eda_btc` | BTC market feature analysis and selection |
+| `02_eda_media` | GDELT media pipeline QC and signal analysis |
+| `03_eda_eth` | ETH market feature analysis and selection |
+| `04_eda_btc_price_and_media` | BTC market + media feature scoring |
+| `05_eda_eth_price_and_media` | ETH market + media feature scoring |
+| `06_eda_btc_with_eth` | ETH cross-asset features for BTC target |
+| `07_eda_eth_with_btc` | BTC cross-asset features for ETH target |
 
-* Data cleaning pipelines
-* Feature engineering
-* Validation logic
-
-👉 Responsibilities:
-
-* Transform raw → clean → analytics-ready data
-* Ensure consistency and quality
-
----
-
-### 🔹 `api/`
-
-FastAPI service exposing the data.
-
-* REST endpoints (`/prices`, `/metrics`)
-* Database queries
-* Business logic layer
-
-👉 Turns the data platform into a **data product**
-
----
-
-### 🔹 `ml/` (optional)
-
-Machine Learning components.
-
-* Dataset preparation
-* Feature engineering
-* Model training & inference
-
-👉 Enables predictive analytics or trading strategies
+### Benchmarks
+| Notebook | Target | Features | Best PR-AUC |
+|----------|--------|----------|-------------|
+| `01_model_benchmark_btc` | BTC | 17 market | **0.771** |
+| `02_model_benchmark_eth` | ETH | 17 market | **0.180** |
+| `03_model_benchmark_btc_media` | BTC | 17 + 7 media | 0.760 |
+| `04_model_benchmark_eth_media` | ETH | 17 + 3 media | 0.169 |
+| `05_model_benchmark_btc_with_eth` | BTC | 17 + 17 ETH cross | 0.766 |
+| `05b_model_benchmark_btc_with_eth_top5` | BTC | 17 + 5 ETH cross | 0.766 |
+| `06_model_benchmark_eth_with_btc` | ETH | 17 + 14 BTC cross | 0.179 |
+| `07_model_benchmark_eth_btc_media` | ETH | 17 + 14 BTC + 3 media | 0.152 |
+| `08_model_benchmark_btc_eth_media` | BTC | 17 + 17 ETH + 7 media | 0.755 |
 
 ---
 
-### 🔹 `streaming/` (optional)
-
-Real-time data processing.
-
-* Kafka producers/consumers
-* Streaming pipelines
-
-👉 Used for near real-time analytics
-
----
-
-### 🔹 `config/`
-
-Centralized configuration.
-
-* API URLs
-* Database settings
-* Environment variables
-
-👉 Avoids hardcoding values across the project
-
----
-
-### 🔹 `utils/`
-
-Shared utilities.
-
-* Logging
-* Helpers
-* Common functions
-
----
-
-# ⏱️ `dags/` — Airflow orchestration
-
-Defines workflow scheduling and dependencies.
-
-* DAGs for ingestion and transformation
-* Task orchestration (`fetch → store → transform`)
-
-👉 This is where pipelines are automated
-
----
-
-# 🧱 `dbt/` — Data transformations
-
-SQL-based transformations using dbt.
-
-* `staging/` → raw data cleaning
-* `intermediate/` → transformations
-* `marts/` → analytics tables
-
-👉 Implements the **Bronze / Silver / Gold** pattern
-
----
-
-# 🗄️ `warehouse/` — Database layer
-
-Manages the data warehouse schema.
-
-* Table definitions (raw, clean, analytics)
-* Indexes and partitioning
-* Migrations
-
-👉 Ensures scalable and optimized storage
-
----
-
-# 🧪 `tests/` — Testing suite
-
-Contains:
-
-* Unit tests (Python)
-* Data tests (SQL/dbt)
-
-👉 Guarantees correctness and reliability
-
----
-
-# 🐳 `docker/` — Containerization
-
-Docker configuration for all services.
-
-* API service
-* Database
-* Airflow
-
-👉 Enables reproducible environments
-
----
-
-# ⚙️ `scripts/` — CLI utilities
-
-Helper scripts for development and operations.
-
-* Manual ingestion
-* Backfills
-* Debug tools
-
----
-
-# 📚 `docs/` — Documentation
-
-Project documentation and design decisions.
-
-* Architecture diagrams
-* Data model description
-* Technical decisions
-
----
-
-# 📓 `notebooks/` — Exploration
-
-Jupyter notebooks for:
-
-* Data exploration
-* Prototyping features
-* ML experiments
-
-👉 Not used in production
-
----
-
-# 📦 Root files
-
-### 🔹 `pyproject.toml`
-
-Defines:
-
-* dependencies
-* packaging
-* tooling (lint, format)
-
----
-
-### 🔹 `docker-compose.yml`
-
-Runs the full stack locally:
+## Setup
 
 ```bash
-docker-compose up
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-Services:
-
-* PostgreSQL
-* Airflow
-* API
-
----
-
-### 🔹 `README.md`
-
-Project documentation (this file)
-
----
-
-# ⚡ How to Run
-
+Run tests:
 ```bash
-# start all services
-docker-compose up --build
+pytest tests/
 ```
 
-Then:
-
-* API → http://localhost:8000
-* Airflow → http://localhost:8080
-
----
-
-# 📊 Data Flow
-
-1. Fetch crypto data from API
-2. Store raw data in database
-3. Transform data (dbt / pipelines)
-4. Store analytics-ready tables
-5. Serve via API
+Run the full benchmark pipeline:
+```bash
+# Open notebooks/benchmark/ in Jupyter and run in order
+jupyter lab
+```
 
 ---
 
-# 🧠 Key Concepts Demonstrated
+## ML configuration
 
-* Data ingestion from external APIs
-* ETL pipeline design
-* Data warehouse modeling
-* Orchestration with Airflow
-* API-based data exposure
-* Modular architecture (src-based)
+Key parameters in `src/ml/config.py`:
 
----
-
-# 🔥 Future Improvements
-
-* Add streaming pipeline (Kafka)
-* Integrate feature store
-* Add ML predictions
-* Implement monitoring & alerting
-* Deploy on cloud (AWS / GCP)
+| Parameter | Value |
+|-----------|-------|
+| Train/test split | 80 / 20 (chronological) |
+| CV folds | 5 (TimeSeriesSplit) |
+| Optuna trials | 100 |
+| Primary metric | PR-AUC |
+| Random state | 42 |
 
 ---
 
-# 🎯 Goal of the Project
+## Data
 
-This project demonstrates how to move from:
-
-> raw API data → production-ready data platform
-
-It is designed to showcase **real-world Data Engineering skills**:
-
-* scalability
-* modularity
-* reliability
-* production readiness
+- **Market data**: Binance public API (BTCUSDT, ETHUSDT), daily OHLCV, 2017-09-16 → 2026-03-27
+- **Media data**: GDELT Project, Bitcoin-related articles, daily aggregation, 2015 → 2026
+- Data is stored under `data/` following the Bronze / Silver / Gold layering
 
 ---
+
+## Report
+
+The full research paper is available at [`report.pdf`](report.pdf).
+
+---
+
+## Authors
+
+Pierre Glerant · Hamza Errahj — CentraleSupélec, Université Paris-Saclay
