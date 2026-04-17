@@ -1,0 +1,108 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/crypto
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crypto
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crypto"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  airflow-init:
+    image: apache/airflow:2.10.5
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
+    command: >
+      bash -c "
+      mkdir -p /opt/airflow/project/data/bronze /opt/airflow/project/data/silver /opt/airflow/project/data/gold &&
+      mkdir -p /opt/airflow/secrets &&
+      cp /home/airflow/.config/gcloud/legacy_credentials/herrahj@gmail.com/adc.json /opt/airflow/secrets/adc.json &&
+      chown -R 50000:0 /opt/airflow/project/data &&
+      chown 50000:0 /opt/airflow/secrets/adc.json &&
+      chmod -R g+rwX /opt/airflow/project/data &&
+      chmod 600 /opt/airflow/secrets/adc.json &&
+      airflow db migrate &&
+      airflow pools set gdelt_api_pool 1 'GDELT API rate limit' &&
+      airflow users create --role Admin --username admin --password admin --firstname Air --lastname Flow --email admin@example.com || true
+      "
+    user: "0:0"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+      - ${HOME}/.config/gcloud:/home/airflow/.config/gcloud:ro
+      - gcp_secrets:/opt/airflow/secrets
+    depends_on:
+      db:
+        condition: service_healthy
+
+  airflow-scheduler:
+    image: apache/airflow:2.10.5
+    restart: unless-stopped
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
+    command: scheduler
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+      - gcp_secrets:/opt/airflow/secrets
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-webserver:
+    image: apache/airflow:2.10.5
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@db:5432/crypto
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PYTHONPATH: /opt/airflow/project:/opt/airflow/project/src
+      GOOGLE_CLOUD_PROJECT: crypto-prediction-gdelt
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/adc.json
+    command: webserver
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+      - gcp_secrets:/opt/airflow/secrets
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  gcp_secrets:

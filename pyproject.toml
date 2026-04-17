@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-platform"
+version = "0.1.0"
+description = "Plateforme données crypto : ingestion, pipelines, API, ML, streaming"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "requests>=2.31",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "optuna>=4.0",
+    "xgboost>=2.1",
+    "lightgbm>=4.5",
+    "catboost>=1.2",
+    "seaborn>=0.13",
+    "plotly>=5.0",
+    "nbformat>=4.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "pre-commit>=3.5",
+]
+airflow = [
+    "apache-airflow>=2.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: dépend d'un environnement externe (DB, API, Docker, …)",
+]
+
+[tool.ruff]
+line-length = 150
+target-version = "py311"
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+extend-select = [
+    "E",    # pycodestyle — erreurs (incl. E501 longueur de ligne, alignée sur line-length)
+    "W",    # pycodestyle — avertissements style PEP 8
+    "N",    # pep8-naming — conventions de nommage PEP 8
+    "I",    # isort — ordre des imports (PEP 8)
+    "D",    # pydocstyle — docstrings (PEP 257)
+    "C901", # McCabe — complexité cyclomatique
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pipelines/airflow_dag_factory.py" = ["N803"]
+"src/ml/data.py" = ["N803"]
+"src/pipelines/ml_benchmark.py" = ["N806"]
+"src/ml/training.py" = ["N803", "N806"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
