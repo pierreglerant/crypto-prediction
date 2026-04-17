@@ -96,6 +96,7 @@ def test_run_benchmark_pipeline_orchestrates_search_and_benchmark(monkeypatch) -
     assert all(call["threshold"] == 0.33 for call in benchmark_calls)
     assert all(call["verbose"] is False for call in benchmark_calls)
     assert all(call["plot_confusion"] is False for call in benchmark_calls)
+    assert [call["model_name"] for call in benchmark_calls] == ["dummy", "xgboost"]
 
 
 def test_run_benchmark_pipeline_returns_empty_results_when_no_models(monkeypatch) -> None:

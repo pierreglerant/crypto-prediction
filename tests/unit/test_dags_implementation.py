@@ -3,7 +3,90 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import sys
+import types
 from pathlib import Path
+
+
+class _StubDAG:
+    """Minimal DAG context manager for loading DAG files without apache-airflow."""
+
+    _current: _StubDAG | None = None
+
+    def __init__(self, dag_id: str, **kwargs: object) -> None:
+        self.dag_id = dag_id
+        self.task_dict: dict[str, _StubPythonOperator] = {}
+
+    def __enter__(self) -> _StubDAG:
+        _StubDAG._current = self
+        return self
+
+    def __exit__(self, *args: object) -> bool:
+        _StubDAG._current = None
+        return False
+
+    def get_task(self, task_id: str) -> _StubPythonOperator:
+        return self.task_dict[task_id]
+
+
+class _StubPythonOperator:
+    def __init__(
+        self,
+        task_id: str,
+        python_callable: object,
+        execution_timeout: object = None,
+        pool: str | None = None,
+        **kwargs: object,
+    ) -> None:
+        dag = _StubDAG._current
+        if dag is None:
+            raise RuntimeError("PythonOperator used outside DAG context")
+        self.task_id = task_id
+        self.python_callable = python_callable
+        self.downstream_task_ids: set[str] = set()
+        self.pool = pool
+        dag.task_dict[task_id] = self
+
+    def __rshift__(self, other: object) -> object:
+        if isinstance(other, list):
+            cur = self
+            for t in other:
+                cur = cur >> t
+            return cur
+        self.downstream_task_ids.add(other.task_id)  # type: ignore[attr-defined]
+        return other
+
+
+class _StubVariable:
+    @staticmethod
+    def get(key: str, default: str | None = None, default_var: str | None = None) -> str:
+        val = default if default is not None else default_var
+        return val if val is not None else ""
+
+
+def _register_airflow_stub_modules() -> None:
+    """Populate sys.modules with minimal Airflow shims (DAG, PythonOperator, Variable)."""
+    airflow_mod = types.ModuleType("airflow")
+    airflow_mod.DAG = _StubDAG
+    sys.modules["airflow"] = airflow_mod
+
+    sdk_mod = types.ModuleType("airflow.sdk")
+    sdk_mod.Variable = _StubVariable
+    sys.modules["airflow.sdk"] = sdk_mod
+
+    pyops = types.ModuleType("airflow.providers.standard.operators.python")
+    pyops.PythonOperator = _StubPythonOperator
+    sys.modules["airflow.providers"] = types.ModuleType("airflow.providers")
+    sys.modules["airflow.providers.standard"] = types.ModuleType("airflow.providers.standard")
+    sys.modules["airflow.providers.standard.operators"] = types.ModuleType("airflow.providers.standard.operators")
+    sys.modules["airflow.providers.standard.operators.python"] = pyops
+
+
+try:
+    import airflow  # noqa: F401
+except ImportError:
+    _register_airflow_stub_modules()
 
 
 def _load_module(module_name: str, filename: str):
@@ -50,6 +133,7 @@ class _FakeBronzeLayer:
 
     def run(self, fetch_missing=False):
         _GDELT_CALLS["bronze"][-1]["fetch_missing"] = fetch_missing
+        return None
 
 
 class _FakeSilverLayer:
@@ -65,7 +149,6 @@ class _FakeSilverLayer:
 class _FakeGoldLayer:
     def __init__(self, coin_name, source_mappings=None):
         self.coin_name = coin_name
-        self.source_mappings = source_mappings
         self.output_csv = "/tmp/gdelt_gold.csv"
         _GDELT_CALLS["gold"].append({"coin_name": coin_name, "source_mappings": source_mappings})
 
@@ -74,9 +157,8 @@ class _FakeGoldLayer:
 
 
 class _FakeToneBronzeLayer:
-    def __init__(self, coin_name, input_csv=None, output_jsonl=None):
+    def __init__(self, coin_name, input_csv=None):
         self.coin_name = coin_name
-        self.input_csv = input_csv
         self.output_jsonl = "/tmp/gdelt_tone_bronze.jsonl"
         _GDELT_CALLS["tone_bronze"].append({"coin_name": coin_name, "input_csv": input_csv})
 
@@ -85,7 +167,7 @@ class _FakeToneBronzeLayer:
 
 
 class _FakeToneSilverLayer:
-    def __init__(self, coin_name, input_file=None, output_csv=None):
+    def __init__(self, coin_name):
         self.coin_name = coin_name
         self.output_csv = "/tmp/gdelt_tone_silver.csv"
         _GDELT_CALLS["tone_silver"].append({"coin_name": coin_name})
@@ -95,7 +177,7 @@ class _FakeToneSilverLayer:
 
 
 class _FakeToneGoldLayer:
-    def __init__(self, coin_name, input_csv=None, output_csv=None):
+    def __init__(self, coin_name):
         self.coin_name = coin_name
         self.output_csv = "/tmp/gdelt_tone_gold.csv"
         _GDELT_CALLS["tone_gold"].append({"coin_name": coin_name})
