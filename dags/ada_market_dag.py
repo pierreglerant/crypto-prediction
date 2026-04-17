@@ -1,11 +1,11 @@
 """Airflow DAG for Cardano market data pipeline (bronze -> silver -> gold)."""
 
-from src.config.coins import ADA_MARKET
-from src.ingestion.btc import fetch_full_history
-from src.pipelines.airflow_dag_factory import build_market_dag
-from src.processing.btc.gold import build_gold_features
-from src.processing.btc.silver import klines_to_dataframe
-from src.utils.io import save_data
+from config.coins import ADA_MARKET
+from ingestion.btc import fetch_full_history
+from pipelines.airflow_dag_factory import build_market_dag
+from processing.btc.gold import build_gold_features
+from processing.btc.silver import klines_to_dataframe
+from utils.io import save_data
 
 dag = build_market_dag(
     config=ADA_MARKET,

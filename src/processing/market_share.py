@@ -6,8 +6,8 @@ from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
-from src.config.coins import MarketCoinConfig
-from src.processing.btc.silver import klines_to_dataframe
+from config.coins import MarketCoinConfig
+from processing.btc.silver import klines_to_dataframe
 
 
 def _to_daily_amount_frame(raw_klines: Sequence[list], coin: MarketCoinConfig) -> pd.DataFrame:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from src.config.gcp import build_daily_tone_count_query
-from src.ingestion.gdelt.tone_bronze_layer import ToneBronzeLayer
+from config.gcp import build_daily_tone_count_query
+from ingestion.gdelt.tone_bronze_layer import ToneBronzeLayer
 
 
 def test_tone_bronze_layer_prefers_local_tone_gold() -> None:

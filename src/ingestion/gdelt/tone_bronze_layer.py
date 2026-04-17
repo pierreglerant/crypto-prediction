@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-from src.config.gcp import build_daily_tone_count_query
+from config.gcp import build_daily_tone_count_query
 
 try:
     from google.cloud import bigquery

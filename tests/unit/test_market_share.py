@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.config.coins import BTC_MARKET, ETH_MARKET
-from src.processing.market_share import build_market_share_table
+from config.coins import BTC_MARKET, ETH_MARKET
+from processing.market_share import build_market_share_table
 
 
 def _make_raw_kline_row(open_time: int, quote_asset_volume: float) -> list:

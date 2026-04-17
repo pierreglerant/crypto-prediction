@@ -20,8 +20,8 @@ try:
 except ImportError:  # pragma: no cover
     PythonOperator = importlib.import_module("airflow.operators.python").PythonOperator
 
-from src.config.coins import MARKET_COINS
-from src.pipelines.airflow_common import (  # noqa: E402
+from config.coins import MARKET_COINS
+from pipelines.airflow_common import (  # noqa: E402
     run_gdelt_bronze_task,
     run_gdelt_gold_task,
     run_gdelt_merge_task,
@@ -33,7 +33,7 @@ from src.pipelines.airflow_common import (  # noqa: E402
     run_market_gold_task,
     run_market_silver_task,
 )
-from src.processing.market_share import build_market_share_table
+from processing.market_share import build_market_share_table
 
 
 def _get_variable(key: str, default: str) -> str:
@@ -191,7 +191,8 @@ def build_market_share_dag(*, fetch_full_history, save_data) -> DAG:
         ]
         aggregate = PythonOperator(task_id="aggregate", python_callable=task_aggregate, execution_timeout=timedelta(minutes=30))
 
-        fetch_tasks >> aggregate
+        for task in fetch_tasks:
+            task >> aggregate
 
     return dag
 

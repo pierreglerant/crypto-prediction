@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
-from src.config.gcp import build_daily_article_cache_query, load_bigquery_settings
+from config.gcp import build_daily_article_cache_query, load_bigquery_settings
 
 try:
     from google.cloud import bigquery
